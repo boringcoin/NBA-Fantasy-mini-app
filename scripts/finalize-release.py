@@ -33,7 +33,7 @@ def main():
         raise RuntimeError("No build run for the exact source tag")
     run = max(candidates, key=lambda r:r["run_attempt"])
     jobs = json.loads(gh("api", "repos/{}/actions/runs/{}/jobs?per_page=100".format(repo, run["id"])))["jobs"]
-    required = {"Mac-Apple-arm64", "Mac-Intel-x64", "Windows-x64", "Browser extension and instructions"}
+    required = {"Mac-Apple-arm64", "Windows-x64", "Browser extension and instructions"}
     successful = {j["name"] for j in jobs if j["status"] == "completed" and j["conclusion"] == "success"}
     if not required <= successful:
         raise RuntimeError("All original platform builds must have passed")
@@ -45,17 +45,17 @@ def main():
         raise RuntimeError("Invalid draft location")
     release = json.loads(gh("api", location))
     assets = {a["name"]:a for a in release["assets"]}
-    zip_names = {"ThunderFantasy-{}-{}.zip".format(version, name) for name in ("Mac-Apple", "Mac-Intel", "Windows-x64", "Source")}
+    zip_names = {"ThunderFantasy-{}-{}.zip".format(version, name) for name in ("Mac-Apple", "Windows-x64", "Source")}
     expected = zip_names | {"README_zh-CN.md", "VALIDATION.txt", "SHA256SUMS.txt"}
     if set(assets) != expected or any(a["state"] != "uploaded" or a["size"] <= 0 for a in assets.values()):
-        raise RuntimeError("Draft does not contain all seven completed assets")
+        raise RuntimeError("Draft does not contain all six completed assets")
     checksum_location = assets["SHA256SUMS.txt"]["url"]
     if not re.fullmatch(r"https://api\.github\.com/repos/" + re.escape(repo) + r"/releases/assets/\d+", checksum_location):
         raise RuntimeError("Invalid checksum asset location")
     checksums = gh("api", checksum_location, "-H", "Accept: application/octet-stream")
     rows = dict((name, checksum) for checksum, name in (row.split("  ", 1) for row in checksums.strip().splitlines()))
     if set(rows) != zip_names:
-        raise RuntimeError("Checksum list does not cover all four bundles")
+        raise RuntimeError("Checksum list does not cover all three bundles")
     for name in zip_names:
         if not re.fullmatch(r"[0-9a-f]{64}", rows[name]) or assets[name].get("digest") != "sha256:" + rows[name]:
             raise RuntimeError("Uploaded bundle checksum mismatch: " + name)

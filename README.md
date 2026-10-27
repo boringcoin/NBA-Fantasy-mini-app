@@ -10,16 +10,14 @@ Mac / Windows 桌面比分与 Yahoo Fantasy 篮球分析工具。读取使用者
 
 在本仓库的 [Releases](https://github.com/boringcoin/NBA-Fantasy-mini-app/releases) 下载测试包。完整 ZIP 包含安装程序、浏览器同步扩展和说明，解压后按说明安装。
 
-- [Windows x64 测试包](https://github.com/boringcoin/NBA-Fantasy-mini-app/releases/download/v2.1.0/ThunderFantasy-2.1.0-Windows-x64.zip)
-- [Mac Apple 芯片测试包](https://github.com/boringcoin/NBA-Fantasy-mini-app/releases/download/v2.1.0/ThunderFantasy-2.1.0-Mac-Apple.zip)
-- [Mac Intel 测试包](https://github.com/boringcoin/NBA-Fantasy-mini-app/releases/download/v2.1.0/ThunderFantasy-2.1.0-Mac-Intel.zip)
+- [Windows x64 测试包](https://github.com/boringcoin/NBA-Fantasy-mini-app/releases/download/v2.1.1/ThunderFantasy-2.1.1-Windows-x64.zip)
+- [Mac Apple 芯片测试包](https://github.com/boringcoin/NBA-Fantasy-mini-app/releases/download/v2.1.1/ThunderFantasy-2.1.1-Mac-Apple.zip)
 
 各平台安装文件对应如下：
 
 | 电脑 | 安装文件 |
 | --- | --- |
 | Mac Apple 芯片，macOS 13+ | `ThunderFantasy-版本号-mac-arm64.dmg` |
-| Mac Intel，macOS 13+ | `ThunderFantasy-版本号-mac-x64.dmg` |
 | Windows 10/11，64 位 | `ThunderFantasy-版本号-win-x64.exe` |
 
 同时下载浏览器扩展和说明。完整分享 ZIP 中已经附带扩展；GitHub Actions 构建产物中的扩展单列为 `ThunderFantasy-BrowserExtension-and-Docs`。
@@ -38,7 +36,7 @@ Mac / Windows 桌面比分与 Yahoo Fantasy 篮球分析工具。读取使用者
 
 ## 功能
 
-- Mac Apple / Intel 与 Windows x64 支持应用内更新：自动检查并下载，校验后点击“重启并安装”。从旧版首次升级仍需手动安装 2.1.0。
+- Mac Apple 与 Windows x64 支持应用内更新：自动检查并下载，校验后点击“重启并安装”。从旧版首次升级仍需手动安装 2.1.1。
 - 应用管理的同步扩展目录随应用更新维护，浏览器仅需重新加载页面；首次迁移目录需重新配对一次。
 - 雷霆比分、三日赛程、实时战报、双方球员数据；窗口可调大小。
 - 多联盟切换，近 14 天及本赛季场均、GP、当前比赛日统计。
@@ -71,7 +69,7 @@ npm run smoke -- --data-dir .smoke/profile --input .smoke/input.json --smoke-out
 在相应系统打包：
 
 ```sh
-# Mac：Apple 和 Intel 两版
+# Mac：Apple 芯片版
 npm run dist:mac -- --publish never
 
 # Windows：x64 安装程序
@@ -86,15 +84,15 @@ npm run dist:win -- --publish never
 
 可以通过 GitHub Desktop 将本目录建立为仓库并发布。上传时保留 `.github/workflows/build.yml` 和 `package-lock.json`；`.gitignore` 已排除依赖、构建缓存、测试输出、安装包和常见凭证文件。
 
-仓库上传后，进入 **Actions → Build Mac and Windows → Run workflow**。也可以推送与 `package.json` 版本相同的 `v版本号` 标签触发。工作流分别使用 Mac Apple、Mac Intel 和 Windows 原生运行环境执行测试、桌面导出验证及打包。
+仓库上传后，进入 **Actions → Build Mac and Windows → Run workflow**。也可以推送与 `package.json` 版本相同的 `v版本号` 标签触发。工作流分别使用 Mac Apple 和 Windows 原生运行环境执行测试、桌面导出验证及打包。
 
-运行成功后从该次 Actions 页面下载三个安装包产物和 `ThunderFantasy-BrowserExtension-and-Docs`。手动运行只生成构建产物。推送与 package.json 版本一致的 v版本号 标签后，工作流会在三个平台测试和构建全部成功后，自动打包包含安装程序、浏览器扩展和说明的三个 ZIP，并发布到该版本的测试版 Release，同时附上源码包与 SHA-256 校验清单。发布先创建草稿，所有附件上传并核对完整后才公开。只有发布任务临时拥有当前仓库的写权限，不需要个人 GitHub 令牌或 Yahoo 登录信息。Actions 产物保留 30 天，Releases 用于长期分发。
+运行成功后从该次 Actions 页面下载两个安装包产物和 `ThunderFantasy-BrowserExtension-and-Docs`。手动运行只生成构建产物。推送与 package.json 版本一致的 v版本号 标签后，工作流会在两个平台测试和构建全部成功后，自动打包包含安装程序、浏览器扩展和说明的两个 ZIP，并发布到该版本的测试版 Release，同时附上源码包与 SHA-256 校验清单。发布先创建草稿，所有附件上传并核对完整后才公开。只有发布任务临时拥有当前仓库的写权限，不需要个人 GitHub 令牌或 Yahoo 登录信息。Actions 产物保留 30 天，Releases 用于长期分发。
 
 工作流定义参考 [GitHub Actions 工作流语法](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax) 与 [官方运行环境说明](https://docs.github.com/en/actions/reference/runners/github-hosted-runners)。
 
 ## 测试版状态与隐私
 
-Mac 包使用本地临时签名，未经过 Apple 公证；Windows 包没有发布者代码签名，系统可能提示开发者未经验证。Windows 和 Mac Intel 的实际安装、退出、真实账号同步仍需要相应电脑测试。仓库附带的工作流尚需在上传后实际运行，不能将配置文件视为云端验证通过。
+Mac 包使用本地临时签名，未经过 Apple 公证；Windows 包没有发布者代码签名，系统可能提示开发者未经验证。Mac Apple 和 Windows 的实际安装、退出、真实账号同步仍需要相应电脑测试。仓库附带的工作流尚需在上传后实际运行，不能将配置文件视为云端验证通过。
 
 扩展利用浏览器已有的 Yahoo 登录访问页面，不读取或转存密码、Cookie。提取的数据通过 `127.0.0.1:18747` 发送到本机配对的应用，不上传到 GitHub。公开源码与分发安装包不会共享使用者的账号；导出的报告则包含联盟成员和统计数据，请按需要分享。
 

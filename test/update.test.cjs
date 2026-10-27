@@ -8,7 +8,7 @@ async function zipFile(directory,entries){const {createWriteStream}=require('nod
 test('updates select the newest complete matching architecture including test releases; never downgrade',()=>{
   const all=[release('2.0.6'),release('2.0.7'),release('2.0.8','Mac-Apple'),{...release('2.0.9'),draft:true}];
   assert.equal(selectRelease(all,'2.0.6','win32','x64').version,'2.0.7');assert.equal(selectRelease(all,'2.0.6','darwin','arm64').version,'2.0.8');
-  assert.equal(selectRelease(all,'2.0.7','win32','x64'),null);assert.ok(compare('2.0.10','2.0.9')>0);assert.throws(()=>compare('v1.2.3;bad','2.0.1'));
+  assert.equal(selectRelease(all,'2.0.7','win32','x64'),null);assert.ok(compare('2.0.10','2.0.9')>0);assert.throws(()=>selectRelease(all,'2.0.6','darwin','x64'),/暂不支持/);assert.throws(()=>compare('v1.2.3;bad','2.0.1'));
 });
 test('update metadata rejects external download URLs and missing checksum',()=>{
   const wrong=release();wrong.assets[0].browser_download_url='https://evil.example/setup.exe';assert.throws(()=>selectRelease([wrong],'2.0.6','win32','x64'),/校验/);

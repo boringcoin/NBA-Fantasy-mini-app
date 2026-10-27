@@ -5,7 +5,7 @@ const yauzl=require('yauzl');
 const REPO='boringcoin/NBA-Fantasy-mini-app',API=`https://api.github.com/repos/${REPO}/releases?per_page=20`;
 function version(v){const m=/^(?:v)?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.exec(String(v));const values=m?.slice(1).map(Number);return values?.every(n=>Number.isSafeInteger(n)&&n<=65535)?values:null;}
 function compare(a,b){const x=version(a),y=version(b);if(!x||!y)throw Error('更新版本号无效');for(let i=0;i<3;i++)if(x[i]!==y[i])return Math.sign(x[i]-y[i]);return 0;}
-function target(platform,arch){if(platform==='darwin'&&arch==='arm64')return 'Mac-Apple';if(platform==='darwin'&&arch==='x64')return 'Mac-Intel';if(platform==='win32'&&arch==='x64')return 'Windows-x64';throw Error('当前系统或架构暂不支持自动更新');}
+function target(platform,arch){if(platform==='darwin'&&arch==='arm64')return 'Mac-Apple';if(platform==='win32'&&arch==='x64')return 'Windows-x64';throw Error('当前系统或架构暂不支持自动更新');}
 function selectRelease(releases,current,platform,arch){
   if(!Array.isArray(releases))throw Error('GitHub 更新列表格式无效');
   const label=target(platform,arch);
@@ -30,7 +30,8 @@ async function pruneCache(directory,current){
   }
 }
 async function extractBundle(file,directory,release){
-  const root=release.name.slice(0,-4),suffix=release.label==='Windows-x64'?'win-x64.exe':release.label==='Mac-Apple'?'mac-arm64.dmg':'mac-x64.dmg';
+  if(!['Mac-Apple','Windows-x64'].includes(release.label))throw Error('不支持的更新平台');
+  const root=release.name.slice(0,-4),suffix=release.label==='Windows-x64'?'win-x64.exe':'mac-arm64.dmg';
   const installerName=`ThunderFantasy-${release.version}-${suffix}`,expected=`${root}/${installerName}`,seen=new Set();
   await fs.mkdir(directory,{recursive:true,mode:0o700});let total=0,count=0;
   return new Promise((resolve,reject)=>yauzl.open(file,{lazyEntries:true,strictFileNames:true,validateEntrySizes:true},(error,zip)=>{

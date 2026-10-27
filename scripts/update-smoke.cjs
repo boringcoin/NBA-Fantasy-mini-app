@@ -6,8 +6,8 @@ const version=require('../package.json').version,platform=process.platform,arch=
 async function run(file,args){return new Promise((resolve,reject)=>{const child=spawn(file,args,{stdio:['ignore','pipe','pipe']});let output='';child.stdout.on('data',v=>output+=v);child.stderr.on('data',v=>output+=v);child.once('error',reject);child.once('exit',code=>code===0?resolve(output):reject(Error(file+' exited '+code+'\n'+output)));});}
 async function waitFor(file,expected){const end=Date.now()+180000;while(Date.now()<end){try{const text=(await fs.readFile(file,'utf8')).trim();if(text===expected)return;if(text.startsWith('failed'))throw Error(text);}catch(e){if(e.code!=='ENOENT')throw e;}await new Promise(r=>setTimeout(r,300));}throw Error('Update helper timed out: '+file);}
 async function main(){
-  assert.ok(['darwin','win32'].includes(platform));
-  const label=platform==='win32'?'Windows-x64':arch==='arm64'?'Mac-Apple':'Mac-Intel',suffix=platform==='win32'?'win-x64.exe':`mac-${arch}.dmg`;
+  assert.ok((platform==='darwin'&&arch==='arm64')||(platform==='win32'&&arch==='x64'));
+  const label=platform==='win32'?'Windows-x64':'Mac-Apple',suffix=platform==='win32'?'win-x64.exe':`mac-${arch}.dmg`;
   const root=path.resolve('.smoke/update'),cache=path.join(root,'cache'),zipName=`ThunderFantasy-${version}-${label}.zip`,installerName=`ThunderFantasy-${version}-${suffix}`;
   await fs.mkdir(root,{recursive:true});
   const zipPath=path.join(root,zipName),zip=require('archiver')('zip',{store:true}),output=createWriteStream(zipPath),finished=new Promise((yes,no)=>{output.on('close',yes);output.on('error',no);zip.on('error',no);});

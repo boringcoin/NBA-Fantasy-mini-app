@@ -15,7 +15,7 @@ spec.loader.exec_module(finalizer)
 class FinalizeSafety(unittest.TestCase):
     def execute(self,failed_build=False,bad_digest=False,published=False):
         calls=[]
-        names=["ThunderFantasy-2.0.2-"+label+".zip" for label in ("Mac-Apple","Mac-Intel","Windows-x64","Source")]
+        names=["ThunderFantasy-2.0.2-"+label+".zip" for label in ("Mac-Apple","Windows-x64","Source")]
         checks={name:hashlib.sha256(name.encode()).hexdigest() for name in names}
         names += ["SHA256SUMS.txt","README_zh-CN.md","VALIDATION.txt"]
         assets=[{"name":name,"state":"uploaded","size":1000,"digest":"sha256:"+checks.get(name,"0"*64),"url":"https://api.github.com/repos/example/project/releases/assets/"+str(i)} for i,name in enumerate(names,1)]
@@ -29,7 +29,7 @@ class FinalizeSafety(unittest.TestCase):
                 if "actions/runs?" in route:
                     return json.dumps({"workflow_runs":[{"id":1,"head_sha":"a"*40,"head_branch":"v2.0.2","path":".github/workflows/build.yml","run_attempt":1}]})
                 if route.endswith("/jobs?per_page=100"):
-                    names=["Mac-Apple-arm64","Mac-Intel-x64","Windows-x64","Browser extension and instructions"]
+                    names=["Mac-Apple-arm64","Windows-x64","Browser extension and instructions"]
                     return json.dumps({"jobs":[{"name":name,"status":"completed","conclusion":"failure" if failed_build and name=="Windows-x64" else "success"} for name in names]})
                 if route.endswith("/releases/123"):return json.dumps({"assets":assets})
                 if "/releases/assets/" in route:return "\n".join(checksum+"  "+name for name,checksum in checks.items())

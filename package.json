@@ -1,7 +1,7 @@
 {
   "name": "thunder-fantasy-desktop",
   "productName": "Thunder Fantasy",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "description": "独立的雷霆比分与 Yahoo Fantasy 联盟分析桌面应用",
   "author": "Thunder Fantasy contributors",
   "license": "UNLICENSED",
@@ -10,7 +10,7 @@
   "scripts": {
     "start": "electron .",
     "test": "node --test test/*.test.cjs",
-    "dist:mac": "electron-builder --mac dmg zip --arm64 --x64",
+    "dist:mac": "electron-builder --mac dmg zip --arm64",
     "dist:win": "electron-builder --win nsis zip --x64",
     "smoke": "electron . --smoke-test"
   },

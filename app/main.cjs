@@ -103,7 +103,7 @@ app.whenReady().then(async()=>{
     if(args.includes('--network')){await refreshScore();if(score.error)throw Error(score.error);process.stdout.write('ESPN_NETWORK_OK '+score.events.length+'\n');}
     await win.webContents.executeJavaScript("document.querySelector('[data-page=settings]').click()");
     updater.emit({phase:'downloading',version:'9.0.0',progress:45});await new Promise(r=>setTimeout(r,50));
-    if(!await win.webContents.executeJavaScript("document.getElementById('update-progress').value===45&&!document.getElementById('update-banner').hidden"))throw Error('自动更新下载进度未显示');
+    if(!await win.webContents.executeJavaScript("document.getElementById('update-progress').value===45&&!document.getElementById('update-banner').hidden"))throw Error('自动更新下载进度未显示：'+JSON.stringify(await win.webContents.executeJavaScript("({progress:document.getElementById('update-progress')?.value,hidden:document.getElementById('update-banner')?.hidden,text:document.getElementById('update-banner-text')?.textContent})")));
     updater.emit({phase:'ready',progress:100});await new Promise(r=>setTimeout(r,50));
     if(!await win.webContents.executeJavaScript("!document.getElementById('update-banner-install').hidden"))throw Error('自动更新安装入口未显示');
     updater.emit({phase:'idle',version:null,progress:0});

@@ -35,7 +35,7 @@ def main():
     if os.environ.get("GITHUB_EVENT_NAME") != "push" or os.environ.get("GITHUB_REF") != "refs/tags/" + tag:
         raise RuntimeError("Publishing is allowed only for an explicit version-tag push")
     artifacts = args.artifacts.resolve()
-    variants = [("mac", "mac-arm64.dmg"), ("mac", "mac-x64.dmg"), ("windows", "win-x64.exe")]
+    variants = [("mac", "mac-arm64.dmg"), ("windows", "win-x64.exe")]
     for folder, suffix in variants:
         name = "ThunderFantasy-{}-{}".format(version, suffix)
         matches = list(artifacts.rglob(name))
@@ -48,14 +48,14 @@ def main():
     verification.write_text(
         "GitHub Actions 构建验证\n\n"
         "版本：{}\n提交：{}\n".format(tag, revision)
-        + "三个原生运行环境（Mac Apple、Mac Intel、Windows x64）的自动化测试、"
+        + "两个原生运行环境（Mac Apple、Windows x64）的自动化测试、"
         "使用合成数据的应用启动及独立导出检查均成功后，才执行此发布任务。\n"
         "这不代表新用户真实 Yahoo 登录和同步已验证。安装包没有开发者身份签名或 Apple 公证。\n",
         encoding="utf-8",
     )
     subprocess.run([sys.executable, str(project / "scripts/package-delivery.py"), "--verification", str(verification)], cwd=project, check=True)
     output = project.parent / "outputs" / ("ThunderFantasy-" + version)
-    expected = {"ThunderFantasy-{}-{}.zip".format(version, x) for x in ("Mac-Apple", "Mac-Intel", "Windows-x64", "Source")}
+    expected = {"ThunderFantasy-{}-{}.zip".format(version, x) for x in ("Mac-Apple", "Windows-x64", "Source")}
     # Release attachment names use ASCII for consistent URLs across clients.
     for original, public_name in (("使用说明.md", "README_zh-CN.md"), ("验证记录.txt", "VALIDATION.txt")):
         shutil.copyfile(output / original, output / public_name)

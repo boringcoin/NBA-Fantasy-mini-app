@@ -1,6 +1,6 @@
 """Package installers, the extension, and instructions for sharing.
 
-Run only after building all three installers. No installed user profile is read.
+Run only after building both installers. No installed user profile is read.
 Use --verification PATH to include actual release-specific verification results.
 """
 from pathlib import Path
@@ -32,7 +32,6 @@ def main():
     verification = args.verification.read_text(encoding="utf-8") if args.verification else ""
     variants = [
         ("Mac-Apple", project / ("release/mac/ThunderFantasy-" + version + "-mac-arm64.dmg")),
-        ("Mac-Intel", project / ("release/mac/ThunderFantasy-" + version + "-mac-x64.dmg")),
         ("Windows-x64", project / ("release/windows/ThunderFantasy-" + version + "-win-x64.exe")),
     ]
     for _, installer in variants:
@@ -70,7 +69,7 @@ def main():
 HTML 单文件可离线排序、切换联盟和背景色。每盟导出 5 张 PNG。
 
 本包从空配置启动，没有开发者的个人联盟、球队、登录或配对凭证。
-Windows 与 Mac Intel 仍需要相应电脑实机验证；真实 Yahoo 同步依赖
+Mac Apple 与 Windows 仍需要相应电脑实机验证；真实 Yahoo 同步依赖
 对方自己的登录状态和网页结构。没有 Apple 公证或 Windows 发布者签名，
 系统可能提示未验证开发者。本包是测试版，具体测试范围见随发布提供的记录。
 
@@ -79,7 +78,7 @@ Windows 与 Mac Intel 仍需要相应电脑实机验证；真实 Yahoo 同步依
 问题反馈请附系统/浏览器版本、失败步骤、状态栏错误文字或截图，
 请不要分享配对码、浏览器凭证或无关个人信息。
 
-2.1.0 起支持应用内检查、下载及重启安装。首次从旧版升级仍需安装本版一次。
+2.1.1 起支持应用内检查、下载及重启安装。首次从旧版升级仍需安装本版一次。
 推荐在“设置与配对 → 应用更新”打开应用管理的扩展目录，浏览器加载
 那个 YahooSync；以后扩展文件会随应用维护，弹窗提示时刷新 Yahoo 页面。
 完整说明见同目录“使用说明.md”。
@@ -112,14 +111,14 @@ Yahoo 联盟标签页；只更新桌面应用不会替换浏览器里的旧同�
     (destination / "使用说明.md").write_text(docs.read_text(encoding="utf-8"), encoding="utf-8")
     notes = """Thunder Fantasy VERSION 打包检查记录
 
-本脚本检查了三个安装包存在、文件大小符合预期、应用与扩展版本一致；
-三个转发 ZIP 的 CRC 和文件清单均通过检查，SHA-256 见 SHA256SUMS.txt。
+本脚本检查了两个安装包存在、文件大小符合预期、应用与扩展版本一致；
+两个转发 ZIP 的 CRC 和文件清单均通过检查，SHA-256 见 SHA256SUMS.txt。
 转发包只包含安装程序、扩展及使用说明，不复制已安装应用的用户数据。
 GitHub 源码包通过允许清单生成，不包含构建缓存或用户配置。
 
 这些打包检查不代表已在对应系统运行，也不代表真实 Yahoo 账号同步成功。
 运行测试、依赖审计、签名校验等结果仅以本版本单独的实际验证记录为准。
-Windows 与 Mac Intel 需要相应电脑实机测试。安装包没有开发者身份签名/公证。
+Mac Apple 与 Windows 需要相应电脑实机测试。安装包没有开发者身份签名/公证。
 """.replace("VERSION", version)
     if verification:
         notes += "\n本版本实际验证记录：\n\n" + verification

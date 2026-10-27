@@ -23,11 +23,11 @@ class PublishSafety(unittest.TestCase):
             (root / "package.json").write_text(json.dumps({"version": "2.0.1"}))
             artifacts = root / "artifacts"
             artifacts.mkdir()
-            for suffix in ("mac-arm64.dmg", "mac-x64.dmg", "win-x64.exe"):
+            for suffix in ("mac-arm64.dmg", "win-x64.exe"):
                 (artifacts / ("ThunderFantasy-2.0.1-" + suffix)).write_bytes(b"synthetic installer")
             output = root.parent / "outputs/ThunderFantasy-2.0.1"
             output.mkdir(parents=True)
-            names = ["ThunderFantasy-2.0.1-" + name + ".zip" for name in ("Mac-Apple", "Mac-Intel", "Windows-x64", "Source")]
+            names = ["ThunderFantasy-2.0.1-" + name + ".zip" for name in ("Mac-Apple", "Windows-x64", "Source")]
             names += ["SHA256SUMS.txt", "README_zh-CN.md", "VALIDATION.txt"]
             assets = []
             for name in names:
@@ -63,10 +63,10 @@ class PublishSafety(unittest.TestCase):
                     error = str(caught)
             return calls, error
 
-    def test_all_seven_assets_are_verified_before_draft_is_published(self):
+    def test_all_six_assets_are_verified_before_draft_is_published(self):
         calls, error = self.execute()
         self.assertIsNone(error)
-        self.assertEqual(sum(call[:2] == ("release", "upload") for call in calls), 7)
+        self.assertEqual(sum(call[:2] == ("release", "upload") for call in calls), 6)
         self.assertIn("--draft", next(call for call in calls if call[:2] == ("release", "create")))
         self.assertEqual(calls[-1][:2], ("release", "edit"))
         self.assertIn("--draft=false", calls[-1])
