@@ -11,7 +11,7 @@ function powers(snapshot){
   for(const power of [...(snapshot?.powerHistory||[]),...(snapshot?.leaguePower?.priorWeeks||[]),snapshot?.leaguePower]){
     const columns=power?.columns||snapshot?.columns;
     if(!complete(power,columns,snapshot?.teamID))continue;
-    map.set(power.week,{week:power.week,columns,teams:power.teams,expectedTeamCount:power.expectedTeamCount,matchupPairs:power.matchupPairs||[],updatedAt:power.updatedAt||snapshot.leaguePower?.updatedAt||snapshot.receivedAt,seasonYear:power.seasonYear||season(snapshot)});
+    map.set(power.week,{week:power.week,columns,teams:power.teams,expectedTeamCount:power.expectedTeamCount,matchupPairs:power.matchupPairs||[],updatedAt:power.updatedAt||snapshot.leaguePower?.updatedAt||snapshot.receivedAt,seasonYear:power.seasonYear||season(snapshot),historicalFinal:power.historicalFinal===true});
   }
   return [...map.values()].sort((a,b)=>weekNumber(b.week)-weekNumber(a.week)).slice(0,40);
 }
@@ -22,10 +22,10 @@ function mergePowerHistory(previous,next){
   return [...map.values()].sort((a,b)=>weekNumber(b.week)-weekNumber(a.week)).slice(0,40);
 }
 function availableWeeks(snapshot){
-  const available=new Map(powers(snapshot).map(p=>[p.week,{week:p.week,updatedAt:p.updatedAt,available:true}]));
+  const available=new Map(powers(snapshot).map(p=>[p.week,{week:p.week,updatedAt:p.updatedAt,available:true,historicalFinal:p.historicalFinal}]));
   const current=weekNumber(snapshot?.week);
   // List weeks which can be retried even if Yahoo's first read failed.
-  for(let i=Math.max(1,current-4);i<=current;i++){const week='Week '+i;if(!available.has(week))available.set(week,{week,available:false});}
+  for(let i=1;i<=Math.min(current,40);i++){const week='Week '+i;if(!available.has(week))available.set(week,{week,available:false});}
   return [...available.values()].sort((a,b)=>weekNumber(b.week)-weekNumber(a.week));
 }
 function powerSnapshot(snapshot,week){

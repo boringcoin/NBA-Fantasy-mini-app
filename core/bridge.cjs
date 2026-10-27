@@ -1,5 +1,6 @@
 'use strict';
 const http=require('node:http');
+const {availableWeeks,season}=require('./weeks.cjs');
 function createBridge(state,onChange=()=>{}){
   const server=http.createServer(async(req,res)=>{
     const origin=req.headers.origin||'',ext=req.headers['x-extension-id']||'',validExt=/^[a-p]{32}$/.test(ext);
@@ -13,11 +14,11 @@ function createBridge(state,onChange=()=>{}){
     try{
       if(req.method==='POST'&&req.url==='/pair'){const b=await body();const result=state.pair(String(b.code||''),ext);onChange();return reply(200,{ok:true,...result});}
       if(!state.authorize(req.headers['x-client-id'],String(req.headers.authorization||'').replace(/^Bearer /,''),ext))return reply(401,{error:'配对已失效，请重新配对'});
-      if(req.method==='GET'&&req.url==='/config')return reply(200,{leagues:state.data.leagues});
+      if(req.method==='GET'&&req.url==='/config')return reply(200,{leagues:state.data.leagues,history:Object.fromEntries(Object.entries(state.data.snapshots).map(([id,s])=>[id,{seasonYear:season(s),weeks:availableWeeks(s).filter(w=>w.available&&w.historicalFinal).map(w=>w.week)}]))});
       if(req.method==='POST'&&req.url==='/import-league'){const league=state.importLeague(await body());onChange();return reply(200,{ok:true,league});}
       if(req.method==='POST'&&req.url==='/refresh-request'){await body();state.refresh('full');onChange();return reply(200,{ok:true});}
-      if(req.method==='GET'&&req.url==='/refresh-request')return reply(200,state.command&&Date.now()-state.command.createdAt<600000?state.command:{});
-      if(req.method==='POST'&&req.url==='/snapshot'){state.snapshot(await body());onChange();return reply(200,{ok:true});}
+      if(req.method==='GET'&&req.url==='/refresh-request')return reply(200,state.command&&Date.now()-state.command.createdAt<3600000?state.command:{});
+      if(req.method==='POST'&&req.url==='/snapshot'){const snapshot=await body();state.snapshot(snapshot);onChange();if(snapshot.syncScope==='history'&&!availableWeeks(state.data.snapshots[snapshot.leagueID]).some(w=>w.week===snapshot.powerHistory?.[0]?.week&&w.available&&w.historicalFinal))throw Error('历史周球队统计不完整，未计入排名');return reply(200,{ok:true});}
       if(req.method==='POST'&&req.url==='/refresh-status'){const b=await body();if(state.command?.requestID!==b.requestID)return reply(409,{error:'刷新请求已过期'});state.syncStatus={state:['started','completed'].includes(b.state)?b.state:'waiting',error:String(b.error||'').slice(0,1200),time:Date.now()};if(b.state==='completed')state.command=null;onChange();return reply(200,{ok:true});}
       reply(404,{error:'接口不存在'});
     }catch(error){reply(400,{error:error.message});}

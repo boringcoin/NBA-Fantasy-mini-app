@@ -72,24 +72,27 @@
       const members=pairs.flat();
       const matchupPairs=members.length===ids.size&&new Set(members).size===ids.size?pairs:null;
       const result={...empty,teams:[...rows.values()],matchupPairs,updatedAt:new Date().toISOString()};
-      if(withHistory)await addHistory(league,result);
       return result;
     } catch(e) {return {...empty,error:String(e.message||e)};}
   }
-  async function addHistory(league,result){
+  async function addHistory(league,result,base,cached){
     const week=Number((result.week.match(/\d+/)||[])[0]);result.priorWeeks=[];const errors=[];
-    for(let prior=week-1;prior>=Math.max(1,week-4);prior--){
+    if(!Number.isInteger(week)||week<1||week>40){result.historyError='未识别有效周次，无法补取历史数据';return;}
+    const completed=new Set(base.seasonYear&&cached?.seasonYear===base.seasonYear?cached.weeks||[]:[]);
+    for(let prior=week-1;prior>=1;prior--){
+      if(completed.has('Week '+prior))continue;
       try{
         const url=new URL(`/nba/${league.id}/matchup`,location.origin);url.searchParams.set('week',String(prior));url.searchParams.set('date','totals');
         const doc=await get(url);if((doc.body.textContent.match(/Week\s+(\d+)/)||[])[1]!==String(prior))throw Error('历史周次不一致');
         const parsed=YahooParser.fromDocument(doc);if(parsed.teams.length!==2)throw Error('历史对局不完整');
         const power=await leaguePower(league,doc,{week:'Week '+prior,teams:parsed.teams},false);if(power.error)throw Error(power.error);
-        result.priorWeeks.push({week:power.week,teams:power.teams,expectedTeamCount:power.expectedTeamCount,matchupPairs:power.matchupPairs,updatedAt:power.updatedAt});
+        const saved={week:power.week,teams:power.teams,expectedTeamCount:power.expectedTeamCount,matchupPairs:power.matchupPairs,updatedAt:power.updatedAt,columns:base.columns,seasonYear:base.seasonYear,historicalFinal:true};
+        await send({...base,syncScope:'history',powerHistory:[saved]});
       }catch(e){errors.push('Week '+prior+'：'+String(e.message||e));}
     }
     result.historyError=errors.length?errors.join('；').slice(0,900):null;
   }
-  async function syncLeague(league,todayOnly=false,daily=false) {
+  async function syncLeague(league,todayOnly=false,daily=false,cached=null) {
     YahooParser.setLeague(league.id);
     const matchupURL=new URL(`/nba/${league.id}/matchup`,location.origin);
     matchupURL.searchParams.set('date','totals');
@@ -153,7 +156,7 @@
       base.research.seasonError=null;
     } catch(error) {base.research.seasonError=String(error.message||error).slice(0,900);}
     base.leaguePower=matchup?await leaguePower(league,matchDoc,base,false):{teams:[],week:base.week,expectedTeamCount:0,error:matchupError,updatedAt:new Date().toISOString()};
-    await addHistory(league,base.leaguePower);
+    await addHistory(league,base.leaguePower,base,cached);
     if(daily) {
       try {
         if(base.research?.error)throw Error(base.research.error);
@@ -188,7 +191,7 @@
         const lease={leagueID:league.id,leaseID:claim.leaseID};currentLease=lease;
         const heartbeat=setInterval(()=>chrome.runtime.sendMessage({type:'sync-heartbeat',...lease}).catch(()=>{}),30000);
         let error='';
-        try{await syncLeague(league,todayOnly,daily);}catch(e){error=String(e.message||e);}
+        try{await syncLeague(league,todayOnly,daily,config?.history?.[league.id]);}catch(e){error=String(e.message||e);}
         finally{
           clearInterval(heartbeat);currentLease=null;
           const released=await chrome.runtime.sendMessage({type:'release-sync',...lease,error});
