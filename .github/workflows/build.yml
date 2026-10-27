@@ -1,0 +1,120 @@
+name: Build Mac and Windows
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+# Manual runs build artifacts. Version tags also publish complete test bundles.
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: ${{ matrix.target }}
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-15
+            target: Mac-Apple-arm64
+            arch: arm64
+            command: npx electron-builder --mac dmg --arm64 --publish never
+          - os: windows-2022
+            target: Windows-x64
+            arch: x64
+            command: npx electron-builder --win nsis --x64 --publish never
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6.5.0
+        with:
+          node-version: '24'
+          architecture: ${{ matrix.arch }}
+          cache: npm
+      - name: Verify target architecture and release tag
+        env:
+          EXPECTED_ARCH: ${{ matrix.arch }}
+        run: node -e "const assert=require('node:assert/strict');assert.equal(process.arch,process.env.EXPECTED_ARCH);if(process.env.GITHUB_REF_TYPE==='tag')assert.equal(process.env.GITHUB_REF_NAME,'v'+require('./package.json').version,'Tag must match package.json version');"
+      - run: npm ci
+      - run: npx install-electron
+      - run: npm test
+      - name: Create synthetic smoke-test input
+        run: node scripts/make-smoke-input.cjs
+      - name: Test actual desktop runtime and exports
+        run: npm run smoke -- --data-dir .smoke/profile --input .smoke/input.json --smoke-output .smoke/result
+      - name: Build installer without publishing
+        run: ${{ matrix.command }}
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - name: Upload installer
+        # Publishing is gated on a real replacement and launch test too.
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: ThunderFantasy-${{ matrix.target }}
+          path: |
+            release/*.dmg
+            release/*.exe
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
+      - name: Collect synthetic validation outputs
+        if: always()
+        run: node -e "const fs=require('node:fs');if(fs.existsSync('.smoke/result'))fs.cpSync('.smoke/result','validation',{recursive:true});"
+      - name: Upload validation outputs separately
+        if: always()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: Validation-${{ matrix.target }}
+          path: validation/**
+          if-no-files-found: ignore
+          retention-days: 7
+
+  extension-and-docs:
+    name: Browser extension and instructions
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/upload-artifact@v7.0.2
+        with:
+          name: ThunderFantasy-BrowserExtension-and-Docs
+          path: |
+            extension/**
+            README.md
+            使用说明.md
+          if-no-files-found: error
+          retention-days: 30
+
+  publish:
+    name: Publish complete test bundles
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs: [build, extension-and-docs]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - name: Download this run's installers
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --pattern 'ThunderFantasy-*' --dir artifacts
+      - name: Verify publication safeguards
+        run: python3 -m unittest discover -s test -p '*_test.py' -v
+      - name: Package and publish versioned downloads
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/publish-release.py --artifacts artifacts
