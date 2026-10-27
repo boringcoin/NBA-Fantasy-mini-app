@@ -74,13 +74,9 @@ async function startInstall({platform,target,prepared,directory,parentPID=proces
   const backup=platform==='darwin'?path.join(path.dirname(target),'.ThunderFantasy-previous-'+path.basename(prepared.stage)+'.app'):path.join(prepared.stage,'previous-app');
   const record={version:prepared.version,target,backup,stage:prepared.stage,result};
   const helper=path.join(prepared.stage,platform==='darwin'?'install.sh':'install.ps1');await fs.writeFile(helper,platform==='darwin'?MAC:WINDOWS,{mode:0o700});
-  const parameters={ParentProcess:parentPID,Target:target,Installer:staged,Backup:backup,Ready:ready,Result:result,ExpectedHash:prepared.installerHash,Start:startAfter?'1':'0'};
-  // Read UTF-8 JSON from the private stage directory, then invoke the fixed
-  // script block explicitly. Arguments never become executable source.
-  const parameterFile=path.join(prepared.stage,'parameters.json');await fs.writeFile(parameterFile,JSON.stringify(parameters),{mode:0o600});
-  const parameterPath=Buffer.from(parameterFile,'utf8').toString('base64');
-  const command="$ErrorActionPreference='Stop';try { $file=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('"+parameterPath+"')); $p=Get-Content -Raw -LiteralPath $file -Encoding UTF8 | ConvertFrom-Json; & {"+WINDOWS+"} -ParentProcess $p.ParentProcess -Target $p.Target -Installer $p.Installer -Backup $p.Backup -Ready $p.Ready -Result $p.Result -ExpectedHash $p.ExpectedHash -Start $p.Start } catch { [Console]::Error.WriteLine($_.Exception.ToString()); exit 1 }";
-  const args=platform==='darwin'?[helper,String(parentPID),target,staged,backup,ready,result,startAfter?'1':'0']:['-NoProfile','-NonInteractive','-EncodedCommand',Buffer.from(command,'utf16le').toString('base64')];
+  // Pass each path as a separate argument to a local script. No shell command
+  // interpolation or change to the system execution policy is needed.
+  const args=platform==='darwin'?[helper,String(parentPID),target,staged,backup,ready,result,startAfter?'1':'0']:['-NoProfile','-NonInteractive','-File',helper,'-ParentProcess',String(parentPID),'-Target',target,'-Installer',staged,'-Backup',backup,'-Ready',ready,'-Result',result,'-ExpectedHash',prepared.installerHash,'-Start',startAfter?'1':'0'];
   const handle=await fs.open(log,'a',0o600);
   const child=spawn(platform==='darwin'?'/bin/sh':path.join(process.env.SystemRoot||'C:\\Windows','System32/WindowsPowerShell/v1.0/powershell.exe'),args,{detached:true,windowsHide:true,stdio:['ignore',handle.fd,handle.fd]});
   try{
