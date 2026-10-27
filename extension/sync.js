@@ -56,26 +56,22 @@
       const members=pairs.flat();
       const matchupPairs=members.length===ids.size&&new Set(members).size===ids.size?pairs:null;
       const result={...empty,teams:[...rows.values()],matchupPairs,updatedAt:new Date().toISOString()};
-      if(withHistory) {
-        result.priorWeeks=[];const errors=[];
-        // Completed weeks only; bounded to four. Never run on ten-minute today-only syncs.
-        for(let prior=Number(week)-1;prior>=Math.max(1,Number(week)-4);prior--) {
-          try {
-            const url=new URL(`/nba/${league.id}/matchup`,location.origin);
-            url.searchParams.set('week',String(prior));url.searchParams.set('date','totals');
-            const doc=await get(url);
-            if((doc.body.textContent.match(/Week\s+(\d+)/)||[])[1]!==String(prior))throw Error('历史周次不一致');
-            const parsed=YahooParser.fromDocument(doc);
-            if(parsed.teams.length!==2)throw Error('历史对局不完整');
-            const power=await leaguePower(league,doc,{week:'Week '+prior,teams:parsed.teams},false);
-            if(power.error)throw Error(power.error);
-            result.priorWeeks.push({week:power.week,teams:power.teams,expectedTeamCount:power.expectedTeamCount,matchupPairs:power.matchupPairs,updatedAt:power.updatedAt});
-          } catch(e) {errors.push('Week '+prior+'：'+String(e.message||e));}
-        }
-        result.historyError=errors.length?errors.join('；').slice(0,900):null;
-      }
+      if(withHistory)await addHistory(league,result);
       return result;
     } catch(e) {return {...empty,error:String(e.message||e)};}
+  }
+  async function addHistory(league,result){
+    const week=Number((result.week.match(/\d+/)||[])[0]);result.priorWeeks=[];const errors=[];
+    for(let prior=week-1;prior>=Math.max(1,week-4);prior--){
+      try{
+        const url=new URL(`/nba/${league.id}/matchup`,location.origin);url.searchParams.set('week',String(prior));url.searchParams.set('date','totals');
+        const doc=await get(url);if((doc.body.textContent.match(/Week\s+(\d+)/)||[])[1]!==String(prior))throw Error('历史周次不一致');
+        const parsed=YahooParser.fromDocument(doc);if(parsed.teams.length!==2)throw Error('历史对局不完整');
+        const power=await leaguePower(league,doc,{week:'Week '+prior,teams:parsed.teams},false);if(power.error)throw Error(power.error);
+        result.priorWeeks.push({week:power.week,teams:power.teams,expectedTeamCount:power.expectedTeamCount,matchupPairs:power.matchupPairs,updatedAt:power.updatedAt});
+      }catch(e){errors.push('Week '+prior+'：'+String(e.message||e));}
+    }
+    result.historyError=errors.length?errors.join('；').slice(0,900):null;
   }
   async function syncLeague(league,todayOnly=false,daily=false) {
     YahooParser.setLeague(league.id);
@@ -104,7 +100,10 @@
       // Keep the roster, but send statistics only for players on today's Yahoo slate.
       base.players=roster.players.map(p=>ids.has(p.id)?p:{...p,stats:{}});
       if(ids.size)base.recentUpdates=YahooParser.fromDocument(await get(rosterURL(league,'AL14'))).players.filter(p=>ids.has(p.id));
-      await send(base);if(matchupError)throw Error(matchupError);return;
+      // Refresh this week's league totals every ten minutes too. Do not fetch
+      // historical weeks or the free-agent pool during this lightweight run.
+      base.leaguePower=matchup?await leaguePower(league,matchDoc,base,false):{teams:[],week:base.week,expectedTeamCount:0,error:matchupError,updatedAt:new Date().toISOString()};
+      await send(base);if(matchupError||base.leaguePower.error)throw Error(matchupError||base.leaguePower.error);return;
     }
     base.syncScope='full';
     await send(base);
@@ -115,8 +114,7 @@
       const ownedIDs=new Set(roster.players.map(p=>p.id));
       base.research={recent:recent.filter(p=>ownedIDs.has(p.id)),prior:prior.filter(p=>ownedIDs.has(p.id)),baselineIDs:[...ownedIDs],available:[],period:'我的球员：近14天场均' ,updatedAt:new Date().toISOString(),error:null};
     } catch(error) {base.research={recent:[],prior:[],baselineIDs:[],available:[],period:'',updatedAt:new Date().toISOString(),error:String(error.message||error)};}
-    // League totals are fetched only on a manual refresh or the existing daily run.
-    // The ten-minute refresh still touches only today's owned players.
+    // Full refresh also retrieves historical totals and season averages.
     // Keep this season's roster averages separate from the prior-season value baseline.
     try {
       const years=Array.from(rosterDoc.querySelectorAll('a[href]')).map(a=>(a.textContent||'').trim().match(/^(20\d{2})[-–]\d{2}(?:\s+Season)?$/i)).filter(Boolean).map(m=>Number(m[1]));
@@ -128,7 +126,8 @@
       base.research.seasonLabel=`${year}–${String(year+1).slice(-2)}赛季`;
       base.research.seasonError=null;
     } catch(error) {base.research.seasonError=String(error.message||error).slice(0,900);}
-    base.leaguePower=matchup?await leaguePower(league,matchDoc,base):{teams:[],week:base.week,expectedTeamCount:0,error:matchupError,updatedAt:new Date().toISOString()};
+    base.leaguePower=matchup?await leaguePower(league,matchDoc,base,false):{teams:[],week:base.week,expectedTeamCount:0,error:matchupError,updatedAt:new Date().toISOString()};
+    await addHistory(league,base.leaguePower);
     if(daily) {
       try {
         if(base.research?.error)throw Error(base.research.error);

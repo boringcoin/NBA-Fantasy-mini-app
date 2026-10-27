@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Thunder Fantasy 本机同步",
-  "version": "2.1.2",
+  "version": "2.1.3",
   "description": "将自己配置的 Yahoo NBA 球队数据同步到本机 Thunder Fantasy，不读取密码或 Cookie。",
   "permissions": [
     "storage",

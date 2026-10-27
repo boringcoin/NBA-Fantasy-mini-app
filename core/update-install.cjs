@@ -86,7 +86,7 @@ async function startInstall({platform,target,prepared,directory,parentPID=proces
     await new Promise((resolve,reject)=>{child.once('spawn',resolve);child.once('error',reject);});child.unref();
     const deadline=Date.now()+15000;let found=false;
     while(Date.now()<deadline){try{await fs.access(ready);found=true;break;}catch{await new Promise(r=>setTimeout(r,100));}}
-    if(!found)throw Error('更新安装器未能启动。请查看更新日志；原应用保持不变。');
+    if(!found){const details=await fs.readFile(log,'utf8').catch(()=>'');throw Error('更新安装器未能启动；原应用保持不变。'+details.slice(-4000));}
     await fs.writeFile(path.join(directory,'pending.json'),JSON.stringify(record),{mode:0o600});return record;
   }finally{await handle.close();}
 }

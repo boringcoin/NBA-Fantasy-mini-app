@@ -8,7 +8,7 @@ const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const safeName=s=>String(s).replace(/[<>:"/\\|?*\x00-\x1f]/g,'_').replace(/[. ]+$/,'').slice(0,70)||'联盟';
 function datasets(snapshots,leagues=[],options={}){
   return Object.values(snapshots).filter(s=>!options.selection?.leagueID||s.leagueID===options.selection.leagueID).flatMap(s=>{
-    const available=availableWeeks(s),target=options.selection?.week||(available.some(w=>w.week===s.week)?s.week:available[0]?.week);
+    const available=availableWeeks(s).filter(w=>w.available),target=options.selection?.week||(available.some(w=>w.week===s.week)?s.week:available[0]?.week);
     const weeks=available.filter(w=>options.allWeeks||w.week===target);
     return weeks.map(w=>{const snapshot=powerSnapshot(s,w.week),analysis=analyze(snapshot);return {snapshot:{...snapshot,leaguePower:{...snapshot.leaguePower,matchupPairs:analysis.scheduleComplete?snapshot.leaguePower.matchupPairs:[]}},analysis,theme:leagues.find(l=>l.id===s.leagueID)?.theme||'white'};}).filter(d=>d.analysis.rows.length);
   });

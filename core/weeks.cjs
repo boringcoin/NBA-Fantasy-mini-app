@@ -21,7 +21,13 @@ function mergePowerHistory(previous,next){
   for(const power of powers(next))map.set(power.week,power);
   return [...map.values()].sort((a,b)=>weekNumber(b.week)-weekNumber(a.week)).slice(0,40);
 }
-function availableWeeks(snapshot){return powers(snapshot).map(p=>({week:p.week,updatedAt:p.updatedAt}));}
+function availableWeeks(snapshot){
+  const available=new Map(powers(snapshot).map(p=>[p.week,{week:p.week,updatedAt:p.updatedAt,available:true}]));
+  const current=weekNumber(snapshot?.week);
+  // List weeks which can be retried even if Yahoo's first read failed.
+  for(let i=Math.max(1,current-4);i<=current;i++){const week='Week '+i;if(!available.has(week))available.set(week,{week,available:false});}
+  return [...available.values()].sort((a,b)=>weekNumber(b.week)-weekNumber(a.week));
+}
 function powerSnapshot(snapshot,week){
   const list=powers(snapshot),power=list.find(p=>p.week===week);
   if(!power)throw Error('该周全盟数据尚未同步，请保持 Yahoo 页面打开并点击刷新');

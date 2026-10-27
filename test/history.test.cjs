@@ -17,7 +17,7 @@ test('week rollover and partial updates preserve complete historical data across
   const dir=await fs.mkdtemp(path.join(os.tmpdir(),'fantasy-history-'));t.after(()=>fs.rm(dir,{recursive:true,force:true}));
   const state=new State(dir);state.configure([{id:'90001',team:'1',name:'Demo'}]);state.snapshot(weekly(1));state.snapshot(weekly(2));
   const partial=weekly(3);partial.syncScope='today';delete partial.leaguePower;delete partial.research;state.snapshot(partial);
-  const saved=new State(dir).data.snapshots['90001'];assert.deepEqual(availableWeeks(saved).map(w=>w.week),['Week 2','Week 1']);
+  const saved=new State(dir).data.snapshots['90001'];assert.deepEqual(availableWeeks(saved).map(w=>w.week),['Week 3','Week 2','Week 1']);
   assert.equal(powerSnapshot(saved,'Week 1').leaguePower.teams[0].stats.PTS,'100');
   assert.throws(()=>powerSnapshot(saved,'Week 3'),/尚未同步/);
 });
@@ -26,14 +26,14 @@ test('incomplete history does not replace a valid week or create zero rankings; 
   const retained=mergeSnapshot(old,broken);assert.equal(powerSnapshot(retained,'Week 1').leaguePower.teams[0].stats.PTS,'100');
   const corrected=weekly(1);corrected.leaguePower.teams[0].stats.PTS='999';
   assert.equal(powerSnapshot(mergeSnapshot(retained,corrected),'Week 1').leaguePower.teams[0].stats.PTS,'999');
-  assert.deepEqual(availableWeeks(broken),[]);
+  assert.deepEqual(availableWeeks(broken).map(w=>[w.week,w.available]),[['Week 1',false]]);
 });
 test('histories stay in their league and season, and use only weeks before the selected week',()=>{
   let s=mergeSnapshot(weekly(1),weekly(2));s=mergeSnapshot(s,weekly(3));
   const w2=powerSnapshot(s,'Week 2');assert.deepEqual(w2.leaguePower.priorWeeks.map(w=>w.week),['Week 1']);
   const fresh=weekly(1);fresh.seasonYear=2027;fresh.syncScope='today';delete fresh.leaguePower;delete fresh.research;
-  assert.deepEqual(availableWeeks(mergeSnapshot(s,fresh)),[]);
-  const other=weekly(4,'90002');assert.deepEqual(availableWeeks(mergeSnapshot(null,other)).map(w=>w.week),['Week 4']);
+  assert.deepEqual(availableWeeks(mergeSnapshot(s,fresh)).map(w=>[w.week,w.available]),[['Week 1',false]]);
+  const other=weekly(4,'90002');assert.deepEqual(availableWeeks(mergeSnapshot(null,other)).filter(w=>w.available).map(w=>w.week),['Week 4']);
 });
 test('historical exports and offline report contain correct weeks and support week selection',async t=>{
   const {datasets,reportHTML,workbook,chartHTML}=require('../core/export.cjs');
