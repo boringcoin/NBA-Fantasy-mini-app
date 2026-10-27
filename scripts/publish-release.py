@@ -15,7 +15,10 @@ import sys
 
 
 def gh(*args, check=True):
-    return subprocess.run(["gh", *args], check=check, capture_output=True, text=True)
+    result = subprocess.run(["gh", *args], capture_output=True, text=True)
+    if check and result.returncode:
+        raise RuntimeError("GitHub command failed: " + result.stderr.strip())
+    return result
 
 
 def main():
@@ -74,20 +77,23 @@ def main():
     )
     notes = project / "release/release-notes.md"
     notes.write_text(description, encoding="utf-8")
-    route = "repos/{}/releases/tags/{}".format(repo, tag)
-    existing = gh("api", route, check=False)
+    existing = gh("release", "view", tag, "--repo", repo, "--json", "apiUrl,isDraft,body", check=False)
     if existing.returncode == 0:
         release = json.loads(existing.stdout)
-        if not release.get("draft") or marker not in release.get("body", ""):
+        if not release.get("isDraft") or marker not in release.get("body", ""):
             raise RuntimeError("Release exists and is not a resumable draft from this exact commit")
     else:
         # Only a missing release allows creation; authentication and service failures do not.
-        if "404" not in existing.stderr:
+        if "not found" not in existing.stderr.lower() and "404" not in existing.stderr:
             raise RuntimeError("Cannot inspect release: " + existing.stderr)
         gh("release", "create", tag, "--repo", repo, "--verify-tag", "--draft", "--prerelease", "--title", "Thunder Fantasy {} 测试版".format(version), "--notes-file", str(notes))
+    # Draft releases are not returned by GET /releases/tags/{tag}; use the release ID.
+    location = json.loads(gh("release", "view", tag, "--repo", repo, "--json", "apiUrl").stdout)["apiUrl"]
+    if not re.fullmatch(r"https://api\.github\.com/repos/" + re.escape(repo) + r"/releases/\d+", location):
+        raise RuntimeError("Invalid release API location")
     for file in files:
         gh("release", "upload", tag, str(file), "--repo", repo, "--clobber")
-    release = json.loads(gh("api", route).stdout)
+    release = json.loads(gh("api", location).stdout)
     remote = {asset["name"]: asset for asset in release["assets"]}
     if set(remote) != expected:
         raise RuntimeError("Release asset list does not match the complete bundle")

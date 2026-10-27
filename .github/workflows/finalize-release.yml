@@ -1,0 +1,22 @@
+name: Finalize verified release draft
+on:
+  push:
+    tags: ['publish-v*']
+permissions:
+  contents: write
+  actions: read
+jobs:
+  finalize:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Check publication safeguards
+        run: python3 -m unittest discover -s test -p '*_test.py' -v
+      - name: Verify built assets and publish the existing draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/finalize-release.py

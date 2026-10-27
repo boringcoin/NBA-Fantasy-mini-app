@@ -43,12 +43,15 @@ class PublishSafety(unittest.TestCase):
             calls, queries = [], [0]
             def fake_gh(*args, **kwargs):
                 calls.append(args)
-                if args[0] == "api":
+                if args[:2] == ("release", "view"):
                     queries[0] += 1
                     if queries[0] == 1:
                         if existing is None:
                             return subprocess.CompletedProcess(args, 1, "", "HTTP 404")
-                        return subprocess.CompletedProcess(args, 0, json.dumps(existing), "")
+                        return subprocess.CompletedProcess(args, 0, json.dumps({"isDraft":existing["draft"], "body":existing["body"]}), "")
+                    return subprocess.CompletedProcess(args, 0, json.dumps({"apiUrl":"https://api.github.com/repos/example/project/releases/123"}), "")
+                if args[0] == "api":
+                    self.assertEqual(args[1],"https://api.github.com/repos/example/project/releases/123")
                     return subprocess.CompletedProcess(args, 0, json.dumps({"assets": assets, "html_url": "https://github.com/example/project/releases/tag/v2.0.1"}), "")
                 return subprocess.CompletedProcess(args, 0, "", "")
             environment = {"GITHUB_REF_NAME": "v2.0.1", "GITHUB_REPOSITORY": "example/project", "GITHUB_SHA": "a" * 40, "GITHUB_EVENT_NAME": event, "GITHUB_REF": "refs/tags/v2.0.1"}
@@ -72,7 +75,7 @@ class PublishSafety(unittest.TestCase):
         for existing in ({"draft": False, "body": ""}, {"draft": True, "body": "another user's draft"}):
             calls, error = self.execute(existing=existing)
             self.assertIn("not a resumable draft", error)
-            self.assertFalse(any(call[0] == "release" for call in calls))
+            self.assertFalse(any(call[:2] in (("release", "upload"),("release", "edit"),("release", "create")) for call in calls))
 
     def test_missing_or_corrupt_asset_keeps_release_a_draft(self):
         for options in ({"missing": True}, {"wrong_size": True}):
