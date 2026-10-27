@@ -30,6 +30,13 @@ async function main(){
   await assert.rejects(startInstall({platform,target,prepared:{...prepared,installerHash:'0'.repeat(64)},directory:cache}),/校验/);
   await fs.access(exe);
   const old=spawn(process.execPath,['-e','setInterval(()=>{},1000)'],{stdio:'ignore'});
+  if(platform==='win32'){
+    const probe=path.join(root,'probe.ps1'),marker=path.join(root,'probe-ready');
+    await fs.writeFile(probe,"param([string]$Marker)\nSet-Content -LiteralPath $Marker -Value 'ready'\n");
+    const ps=path.join(process.env.SystemRoot||'C:\\Windows','System32/WindowsPowerShell/v1.0/powershell.exe');
+    const result=await run(ps,['-NoProfile','-NonInteractive','-File',probe,'-Marker',marker]);
+    if(!await fs.access(marker).then(()=>true,()=>false))throw Error('Direct PowerShell -File failed to create marker; output='+JSON.stringify(result));
+  }
   let record;
   try{record=await startInstall({platform,target,prepared,directory:cache,parentPID:old.pid,startAfter:false});}finally{old.kill();}
   await waitFor(record.result,'installed');assert.equal(await fs.readFile(sentinel,'utf8'),'keep league and pairing');
