@@ -102,10 +102,15 @@ app.whenReady().then(async()=>{
     await new Promise(r=>setTimeout(r,300));const out=argument('--smoke-output');
     if(args.includes('--network')){await refreshScore();if(score.error)throw Error(score.error);process.stdout.write('ESPN_NETWORK_OK '+score.events.length+'\n');}
     await win.webContents.executeJavaScript("document.querySelector('[data-page=settings]').click()");
-    updater.emit({phase:'downloading',version:'9.0.0',progress:45});await new Promise(r=>setTimeout(r,50));
-    if(!await win.webContents.executeJavaScript("document.getElementById('update-progress').value===45&&!document.getElementById('update-banner').hidden"))throw Error('自动更新下载进度未显示：'+JSON.stringify(await win.webContents.executeJavaScript("({progress:document.getElementById('update-progress')?.value,hidden:document.getElementById('update-banner')?.hidden,text:document.getElementById('update-banner-text')?.textContent})")));
-    updater.emit({phase:'ready',progress:100});await new Promise(r=>setTimeout(r,50));
-    if(!await win.webContents.executeJavaScript("!document.getElementById('update-banner-install').hidden"))throw Error('自动更新安装入口未显示');
+    const waitForUpdateUI=async(expression,message)=>{
+      const until=Date.now()+10000;
+      while(Date.now()<until){if(await win.webContents.executeJavaScript(expression))return;await new Promise(r=>setTimeout(r,100));}
+      throw Error(message+': '+JSON.stringify(await win.webContents.executeJavaScript("({progress:document.getElementById('update-progress')?.value,hidden:document.getElementById('update-banner')?.hidden,text:document.getElementById('update-banner-text')?.textContent})")));
+    };
+    updater.emit({phase:'downloading',version:'9.0.0',progress:45});
+    await waitForUpdateUI("document.getElementById('update-progress').value===45&&!document.getElementById('update-banner').hidden",'自动更新下载进度未显示');
+    updater.emit({phase:'ready',progress:100});
+    await waitForUpdateUI("!document.getElementById('update-banner-install').hidden",'自动更新安装入口未显示');
     updater.emit({phase:'idle',version:null,progress:0});
     if(!await win.webContents.executeJavaScript("typeof require==='undefined'&&typeof process==='undefined'&&typeof desktop.getState==='function'"))throw Error('渲染进程隔离失败');
     if(out){await fs.mkdir(out,{recursive:true});await win.webContents.executeJavaScript("document.querySelector('[data-page=settings]').click()");await new Promise(r=>setTimeout(r,100));await fs.writeFile(path.join(out,'首次配置.png'),(await win.webContents.capturePage()).toPNG());}
