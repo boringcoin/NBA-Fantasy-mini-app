@@ -1,11 +1,12 @@
 (() => {
   if(!/^\/nba\/\d+(?:\/|$)/.test(location.pathname))return;
   let leagues=[];
-  let busy=false, lastRequestID=null, activeRequestID=null, activeTodayOnly=false, queuedManualID=null;
+  let busy=false,currentLease=null;
   const parse=html=>new DOMParser().parseFromString(html,'text/html');
   async function get(url) {
     const r=await fetch(url,{credentials:'include',cache:'no-store',signal:AbortSignal.timeout(20000)});
-    if(!r.ok || new URL(r.url).hostname!==location.hostname)throw Error('雅虎页面请求失败或登录失效');
+    if(!r.ok)throw Error(`雅虎页面请求失败（HTTP ${r.status}）：${new URL(url).pathname}`);
+    if(new URL(r.url).hostname!==location.hostname)throw Error('雅虎登录失效，请重新登录 Yahoo');
     return parse(await r.text());
   }
   const rosterURL=(league,period)=>{
@@ -24,7 +25,7 @@
     return players;
   }
   async function send(data) {
-    const result=await chrome.runtime.sendMessage({type:'snapshot',data});
+    const result=await chrome.runtime.sendMessage({type:'snapshot',...currentLease,data});
     if(!result?.ok)throw Error(result?.error||'桌面应用尚未连接');
   }
   const hasGameToday=player=> /(?:\bvs\s+|@\s*)[A-Z]{2,3}\b/i.test(player.info||'') || (player.stats?.PTS!=null && String(player.stats.PTS).trim()!=='' && Number.isFinite(Number(player.stats.PTS)));
@@ -80,10 +81,20 @@
     YahooParser.setLeague(league.id);
     const matchupURL=new URL(`/nba/${league.id}/matchup`,location.origin);
     matchupURL.searchParams.set('date','totals');
-    const [matchDoc,rosterDoc]=await Promise.all([get(matchupURL),get(rosterURL(league))]);
-    const matchup=YahooParser.fromDocument(matchDoc),roster=YahooParser.fromDocument(rosterDoc);
-    if(matchup.teams.length!==2||!matchup.teams.some(t=>t.id===league.team)||!roster.players.length)throw Error(league.name+'：未识别到对局和阵容');
-    const base={league:league.name,leagueID:league.id,teamID:league.team,week:(matchDoc.body.textContent.match(/Week\s+\d+/)||[])[0]||'本周',receivedAt:new Date().toISOString(),columns:matchup.columns,teams:matchup.teams,players:roster.players,source:matchupURL.href};
+    // A missing/default matchup must never prevent a valid owned roster from arriving.
+    const rosterDoc=await get(rosterURL(league)),roster=YahooParser.fromDocument(rosterDoc);
+    if(!roster.players.length)throw Error('阵容读取失败：请确认配置的球队 ID，并在浏览器打开自己的 My Team 页面后重试');
+    let matchDoc=null,matchup=null,matchupError=null;
+    try {
+      matchDoc=await get(matchupURL);matchup=YahooParser.fromDocument(matchDoc);
+      if(matchup.teams.length!==2||!matchup.teams.some(t=>t.id===league.team)) {
+        const week=(matchDoc.body.textContent.match(/Week\s+(\d+)/)||[])[1];
+        const link=week&&[...YahooParser.leagueLinks(rosterDoc,league.id,week,location.origin).matchups,...YahooParser.leagueLinks(matchDoc,league.id,week,location.origin).matchups].find(m=>m.ids.includes(league.team));
+        if(link){matchupURL.href=link.url;matchDoc=await get(matchupURL);matchup=YahooParser.fromDocument(matchDoc);}
+        if(matchup.teams.length!==2||!matchup.teams.some(t=>t.id===league.team))throw Error('未识别到这支球队的本周对局；阵容仍可查看，请核对球队 ID 或稍后重试');
+      }
+    } catch(error) {matchupError=String(error.message||error);matchup=null;}
+    const base={league:league.name,leagueID:league.id,teamID:league.team,week:(matchDoc?.body.textContent.match(/Week\s+\d+/)||rosterDoc.body.textContent.match(/Week\s+\d+/)||[])[0]||'本周',receivedAt:new Date().toISOString(),columns:(matchup||roster).columns,teams:matchup?.teams||[],players:roster.players,source:matchupURL.href,matchupError};
     if(todayOnly) {
       const playing=roster.players.filter(hasGameToday);
       const ids=new Set(playing.map(p=>p.id));
@@ -91,7 +102,7 @@
       // Keep the roster, but send statistics only for players on today's Yahoo slate.
       base.players=roster.players.map(p=>ids.has(p.id)?p:{...p,stats:{}});
       if(ids.size)base.recentUpdates=YahooParser.fromDocument(await get(rosterURL(league,'AL14'))).players.filter(p=>ids.has(p.id));
-      await send(base);return;
+      await send(base);if(matchupError)throw Error(matchupError);return;
     }
     const years=Array.from(rosterDoc.querySelectorAll('a[href]')).map(a=>(a.textContent||'').trim().match(/^(20\d{2})[-–]\d{2}(?:\s+Season)?$/i)).filter(Boolean).map(m=>Number(m[1]));
     const seasonYear=years.length?Math.max(...years):new Date().getFullYear()-(new Date().getMonth()<8?1:0);
@@ -117,7 +128,7 @@
       base.research.seasonLabel=`${year}–${String(year+1).slice(-2)}赛季`;
       base.research.seasonError=null;
     } catch(error) {base.research.seasonError=String(error.message||error).slice(0,900);}
-    base.leaguePower=await leaguePower(league,matchDoc,base);
+    base.leaguePower=matchup?await leaguePower(league,matchDoc,base):{teams:[],week:base.week,expectedTeamCount:0,error:matchupError,updatedAt:new Date().toISOString()};
     if(daily) {
       try {
         if(base.research?.error)throw Error(base.research.error);
@@ -134,28 +145,33 @@
     }
     base.receivedAt=new Date().toISOString();
     await send(base);
-    if(base.research?.error)throw Error(league.name+'：'+base.research.error);
+    const warnings=[matchupError,base.research?.error,base.research?.seasonError,base.leaguePower?.error,base.dailyResearch?.error].filter(Boolean);
+    if(warnings.length)throw Error([...new Set(warnings)].join('；'));
   }
   async function sync(requestID=null,todayOnly=false,daily=false,targetLeague=null) {
-    if(busy)return;busy=true;let acquired=false;
+    if(busy)return;busy=true;
     try {
-      // One tab is enough to synchronize both requested leagues.
       const config=await chrome.runtime.sendMessage({type:'get-config'});
       leagues=config?.leagues||[];
       if(!leagues.some(l=>new RegExp('^/nba/'+l.id+'(?:/|$)').test(location.pathname)))return;
       const selected=leagues.filter(l=>(!targetLeague||l.id===targetLeague)&&(!daily||requestID||l.dailyFreeAgents));
-      if(!selected.length)return;
-      const lock=await chrome.runtime.sendMessage({type:'acquire-sync',todayOnly});
-      if(!lock?.ok)return;acquired=true;
-      if(daily&&!requestID){const claim=await chrome.runtime.sendMessage({type:'acquire-daily'});if(!claim?.ok)return;}
-      activeRequestID=requestID;activeTodayOnly=todayOnly;
-      if(requestID){lastRequestID=requestID;await chrome.runtime.sendMessage({type:'refresh-status',requestID,state:'started'});}
-      const errors=[];
-      for(const league of selected){try{await syncLeague(league,todayOnly,daily);}catch(e){errors.push(String(e.message||e));}}
-      chrome.runtime.sendMessage({type:'status',ok:errors.length===0,error:errors.join('；'),time:Date.now()}).catch(()=>{});
-      if(activeRequestID)await chrome.runtime.sendMessage({type:'refresh-status',requestID:activeRequestID,state:'completed',error:errors.join('；')});
-    } catch(error){chrome.runtime.sendMessage({type:'status',ok:false,error:String(error.message||error),time:Date.now()}).catch(()=>{});if(activeRequestID&&acquired)await chrome.runtime.sendMessage({type:'refresh-status',requestID:activeRequestID,state:'completed',error:String(error.message||error)}).catch(()=>{});}
-    finally{if(acquired)await chrome.runtime.sendMessage({type:'release-sync'}).catch(()=>{});busy=false;activeRequestID=null;activeTodayOnly=false;const queued=queuedManualID;queuedManualID=null;if(queued)await sync(queued.requestID,false,queued.scope==='recommendations',queued.leagueID||null);}
+      // Prefer this page's league; one remaining tab can still service the other leagues.
+      selected.sort((a,b)=>Number(location.pathname.startsWith('/nba/'+b.id+'/'))-Number(location.pathname.startsWith('/nba/'+a.id+'/')));
+      for(const league of selected){
+        const claim=await chrome.runtime.sendMessage({type:'acquire-sync',leagueID:league.id,requestID,todayOnly,daily});
+        if(!claim?.ok)continue;
+        const lease={leagueID:league.id,leaseID:claim.leaseID};currentLease=lease;
+        const heartbeat=setInterval(()=>chrome.runtime.sendMessage({type:'sync-heartbeat',...lease}).catch(()=>{}),30000);
+        let error='';
+        try{await syncLeague(league,todayOnly,daily);}catch(e){error=String(e.message||e);}
+        finally{
+          clearInterval(heartbeat);currentLease=null;
+          const released=await chrome.runtime.sendMessage({type:'release-sync',...lease,error});
+          if(!released?.ok)throw Error(released?.error||'同步任务已失效，请重试');
+        }
+      }
+    } catch(error){chrome.runtime.sendMessage({type:'status',ok:false,error:String(error.message||error),time:Date.now()}).catch(()=>{});}
+    finally{busy=false;}
   }
   const checkDaily=()=>{if(!busy)return sync(null,false,true);};
   // Pairing and the first full sync are initiated by the popup. No account credentials are shared.
@@ -166,11 +182,9 @@
   const checkRefresh=async()=>{
     try {
       const command=await chrome.runtime.sendMessage({type:'get-refresh-request'});
-      if(command?.ok&&command.requestID&&command.requestID!==lastRequestID) {
-        if(busy) {
-          queuedManualID=command;lastRequestID=command.requestID;
-        } else await sync(command.requestID,false,command.scope==='recommendations',command.leagueID||null);
-      }
+      // The background keeps per-league completion. A busy/losing tab retries on
+      // the next poll; it must never mark another league's command as consumed.
+      if(command?.ok&&command.requestID&&!busy)await sync(command.requestID,false,command.scope==='recommendations',command.leagueID||null);
     } catch {}
   };
   setInterval(checkRefresh,5000);

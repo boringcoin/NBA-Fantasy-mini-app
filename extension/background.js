@@ -1,8 +1,20 @@
 'use strict';
-importScripts('team-context.js');
+importScripts('team-context.js','sync-coordinator.js');
 const BASE='http://127.0.0.1:18747';
-let lock=null,lastAuto=0,configCache=null;
-const ready=chrome.storage.session.get(['syncLock','lastAuto']).then(v=>{lock=v.syncLock||null;lastAuto=v.lastAuto||0;});
+let coordinator,configCache=null,coordination=Promise.resolve();
+const ready=chrome.storage.session.get('coordinator').then(v=>{coordinator=new ThunderSyncCoordinator(v.coordinator);});
+function serial(fn){const result=coordination.then(fn,fn);coordination=result.catch(()=>{});return result;}
+async function saveCoordinator(){await chrome.storage.session.set({coordinator:coordinator.saved()});}
+async function leagueStatus(id,state,error=''){
+  const saved=await chrome.storage.local.get('leagueStatus'),statuses=saved.leagueStatus||{};
+  statuses[id]={state,error:String(error).slice(0,1200),time:Date.now()};
+  await chrome.storage.local.set({leagueStatus:statuses});
+}
+function dailyDay(){
+  const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',hourCycle:'h23'}).formatToParts(new Date()),p=Object.fromEntries(parts.map(v=>[v.type,v.value]));
+  return Number(p.hour)<16?null:`${p.year}-${p.month}-${p.day}`;
+}
+async function observeCommand(config){const command=await bridge('/refresh-request');coordinator.observe(command,config.leagues);await saveCoordinator();return command;}
 async function credentials(){return (await chrome.storage.local.get('pairing')).pairing;}
 async function bridge(route,body,auth=true){
   const headers={'Content-Type':'application/json','X-Extension-ID':chrome.runtime.id};
@@ -29,7 +41,7 @@ async function message(m,sender){
   if(m.type==='pair'&&popup){if(!/^\d{6}$/.test(String(m.code)))throw Error('请输入六位配对码');const paired=await bridge('/pair',{code:String(m.code)},false);await chrome.storage.local.set({pairing:{token:paired.token,clientID:paired.clientID}});configCache=null;await bridge('/refresh-request',{});return {ok:true};}
   if(m.type==='unpair'&&popup){await chrome.storage.local.remove('pairing');configCache=null;return {ok:true};}
   if(m.type==='get-config')return {ok:true,...await configuration(true)};
-  if(m.type==='popup-status'&&popup){const saved=await chrome.storage.local.get(['pairing','status']);let appError=null,config=null;try{config=await configuration();}catch(e){appError=e.message;}return {ok:true,paired:!!saved.pairing,status:saved.status,config,appError};}
+  if(m.type==='popup-status'&&popup){const saved=await chrome.storage.local.get(['pairing','status','leagueStatus']);let appError=null,config=null;try{config=await configuration();}catch(e){appError=e.message;}return {ok:true,paired:!!saved.pairing,status:saved.status,leagueStatus:saved.leagueStatus||{},config,appError};}
   if(m.type==='request-refresh'&&popup){await bridge('/refresh-request',{});return {ok:true};}
   if(m.type==='current-team'&&popup)return {ok:true,context:await currentTeam()};
   if(m.type==='import-team'&&popup){
@@ -42,19 +54,39 @@ async function message(m,sender){
   }
   if(!content)throw Error('该消息仅允许同步页面发送');
   const config=await configuration(),id=new URL(sender.url).pathname.match(/^\/nba\/(\d+)/)?.[1];if(!config.leagues.some(l=>l.id===id))throw Error('当前页面不属于配置的联盟');
-  if(m.type==='acquire-sync'){
-    if(lock&&Date.now()-lock.time<10*60*1000)return {ok:false};
-    if(m.todayOnly&&Date.now()-lastAuto<9.5*60*1000)return {ok:false};
-    lock={tab:sender.tab.id,time:Date.now()};if(m.todayOnly)lastAuto=Date.now();await chrome.storage.session.set({syncLock:lock,lastAuto});return {ok:true};
-  }
-  if(m.type==='release-sync'){if(lock?.tab===sender.tab.id){lock=null;await chrome.storage.session.remove('syncLock');}return {ok:true};}
-  if(m.type==='acquire-daily'){
-    const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',hourCycle:'h23'}).formatToParts(new Date()),p=Object.fromEntries(parts.map(v=>[v.type,v.value]));
-    if(Number(p.hour)<16)return {ok:false};const day=`${p.year}-${p.month}-${p.day}`,saved=await chrome.storage.local.get('dailyDate');if(saved.dailyDate===day)return {ok:false};await chrome.storage.local.set({dailyDate:day});return {ok:true};
-  }
-  if(m.type==='snapshot'){if(lock?.tab!==sender.tab.id)throw Error('同步锁已释放，请重试');await bridge('/snapshot',m.data);return {ok:true};}
-  if(m.type==='get-refresh-request')return {ok:true,...await bridge('/refresh-request')};
-  if(m.type==='refresh-status'){await bridge('/refresh-status',{requestID:m.requestID,state:m.state,error:m.error||''});return {ok:true};}
+  if(['acquire-sync','release-sync','sync-heartbeat','snapshot','get-refresh-request'].includes(m.type))return serial(async()=>{
+    if(m.type==='get-refresh-request')return {ok:true,...await observeCommand(config)};
+    const leagueID=m.type==='snapshot'?m.data?.leagueID:m.leagueID;
+    const league=config.leagues.find(l=>l.id===leagueID);
+    if(!league)throw Error('同步任务没有有效的联盟 ID；更新扩展后请刷新所有 Yahoo 标签页');
+    if(m.type==='acquire-sync'){
+      // Observe the desktop command before granting any lease. Completion belongs
+      // to all target leagues, never to whichever tab finishes its batch first.
+      await observeCommand(config);
+      const lease=coordinator.acquire(leagueID,sender.tab.id,{requestID:m.requestID,todayOnly:m.todayOnly,daily:m.daily,day:dailyDay()});
+      if(!lease)return {ok:false};
+      await saveCoordinator();await leagueStatus(leagueID,'started');
+      if(m.requestID)await bridge('/refresh-status',{requestID:m.requestID,state:'started'}).catch(()=>{});
+      return {ok:true,leaseID:lease.leaseID};
+    }
+    if(!coordinator.owns(leagueID,sender.tab.id,m.leaseID))throw Error('这个联盟的同步任务已失效，请重试');
+    if(m.type==='snapshot'){
+      coordinator.heartbeat(leagueID,sender.tab.id,m.leaseID);await saveCoordinator();
+      await bridge('/snapshot',m.data);return {ok:true};
+    }
+    if(m.type==='sync-heartbeat'){
+      coordinator.heartbeat(leagueID,sender.tab.id,m.leaseID);await saveCoordinator();return {ok:true};
+    }
+    const error=String(m.error||'').slice(0,1200);
+    coordinator.finish(leagueID,sender.tab.id,m.leaseID,error);await saveCoordinator();
+    await leagueStatus(leagueID,error?'error':'completed',error);
+    const completion=coordinator.completion();
+    if(completion){
+      await bridge('/refresh-status',{...completion,state:'completed'});
+      await chrome.storage.local.set({status:{ok:!completion.error,error:completion.error,time:Date.now()}});
+    }
+    return {ok:true};
+  });
   if(m.type==='status'){await chrome.storage.local.set({status:{ok:m.ok,error:String(m.error||'').slice(0,1200),time:m.time}});return {ok:true};}
   throw Error('未知操作');
 }

@@ -1,11 +1,34 @@
 {
   "manifest_version": 3,
   "name": "Thunder Fantasy 本机同步",
-  "version": "2.0.2",
+  "version": "2.0.3",
   "description": "将自己配置的 Yahoo NBA 球队数据同步到本机 Thunder Fantasy，不读取密码或 Cookie。",
-  "permissions": ["storage", "alarms"],
-  "host_permissions": ["http://127.0.0.1:18747/*", "https://basketball.fantasysports.yahoo.com/nba/*"],
-  "background": {"service_worker": "background.js"},
-  "content_scripts": [{"matches": ["https://basketball.fantasysports.yahoo.com/nba/*"], "js": ["team-context.js", "parser.js", "sync.js"], "run_at": "document_idle"}],
-  "action": {"default_title": "Thunder Fantasy 同步", "default_popup": "popup.html"}
+  "permissions": [
+    "storage",
+    "alarms"
+  ],
+  "host_permissions": [
+    "http://127.0.0.1:18747/*",
+    "https://basketball.fantasysports.yahoo.com/nba/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://basketball.fantasysports.yahoo.com/nba/*"
+      ],
+      "js": [
+        "team-context.js",
+        "parser.js",
+        "sync.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_title": "Thunder Fantasy 同步",
+    "default_popup": "popup.html"
+  }
 }

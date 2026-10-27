@@ -80,6 +80,8 @@ Windows 与 Mac Intel 仍需要相应电脑实机验证；真实 Yahoo 同步依
 请不要分享配对码、浏览器凭证或无关个人信息。
 
 完整说明见同目录“使用说明.md”。
+旧版升级时也要更新 YahooSync 中的全部文件，重新加载扩展，并刷新所有
+Yahoo 联盟标签页；只更新桌面应用不会替换浏览器里的旧同步脚本。
 """.replace("VERSION", version)
     for label, installer in variants:
         root = "ThunderFantasy-" + version + "-" + label

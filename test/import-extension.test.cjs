@@ -11,7 +11,7 @@ test('team import accepts only a concrete Yahoo NBA team URL, never guesses from
 });
 function background(){
   const state={tab:{id:7,url:SOURCE},requests:[],messages:[],leagues:[],paired:true,contextAvailable:true,afterMetadata:null};
-  const sandbox={URL,Date,AbortSignal,ThunderTeamContext:context,importScripts:()=>{},fetch:async(url,options)=>{
+  const sandbox={URL,Date,AbortSignal,ThunderSyncCoordinator:require('../extension/sync-coordinator.js'),ThunderTeamContext:context,importScripts:()=>{},fetch:async(url,options)=>{
     state.requests.push({url,options,body:options.body&&JSON.parse(options.body)});
     if(url.endsWith('/import-league')){state.leagues=[{id:'90001',team:'6',name:'Demo League'}];return {ok:true,json:async()=>({ok:true,league:state.leagues[0]})};}
     return {ok:true,json:async()=>({leagues:state.leagues})};
