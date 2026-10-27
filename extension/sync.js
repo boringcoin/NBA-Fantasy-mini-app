@@ -51,7 +51,23 @@
         if(teams.length!==2||!match.ids.every(id=>teams.some(t=>t.id===id)))throw Error('对局统计解析不完整');
         teams.forEach(t=>rows.set(t.id,t));
       }
-      if(rows.size!==ids.size||![...ids].every(id=>rows.has(id)))throw Error(`仅获取 ${rows.size}/${ids.size} 队，暂不生成全盟排名`);
+      // League home often links only to the current week's schedule. For a
+      // historical week, query missing team totals against a known team. These
+      // are comparisons only: never claim them as actual historical pairings.
+      if(rows.size<ids.size){
+        const known=[...rows.keys()].find(id=>ids.has(id));
+        if(known)for(const missing of ids){
+          if(rows.has(missing))continue;
+          const url=new URL(`/nba/${league.id}/matchup`,location.origin);
+          for(const [key,value]of Object.entries({week,mid1:missing,mid2:known,date:'totals'}))url.searchParams.set(key,value);
+          const doc=await get(url);
+          if((doc.body.textContent.match(/Week\s+(\d+)/)||[])[1]!==week)throw Error('历史对局返回周次不一致');
+          const teams=YahooParser.fromDocument(doc).teams;
+          if(teams.length!==2||!teams.some(t=>t.id===missing)||!teams.some(t=>t.id===known))continue;
+          rows.set(missing,teams.find(t=>t.id===missing));
+        }
+      }
+      if(rows.size!==ids.size||![...ids].every(id=>rows.has(id)))throw Error(`仅获取 ${rows.size}/${ids.size} 队，Yahoo 未返回其余球队的本周数据；请稍后重试`);
       const pairs=matches.filter(m=>m.ids.every(id=>ids.has(id))).map(m=>m.ids);
       const members=pairs.flat();
       const matchupPairs=members.length===ids.size&&new Set(members).size===ids.size?pairs:null;
@@ -199,7 +215,7 @@
   setInterval(checkRefresh,5000);
   chrome.runtime.onMessage.addListener((message,_sender,respond)=>{
     if(message.type==='auto-sync')sync(null,true);
-    if(message.type==='check-refresh')checkRefresh();
+    if(message.type==='check-refresh'){checkRefresh();respond({ok:true});}
     if(message.type==='team-context')respond({ok:true,context:ThunderTeamContext.fromDocument(document,location.href)});
   });
 })();

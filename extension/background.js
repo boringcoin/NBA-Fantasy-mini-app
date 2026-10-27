@@ -45,7 +45,16 @@ async function message(m,sender){
   if(m.type==='unpair'&&popup){await chrome.storage.local.remove('pairing');configCache=null;return {ok:true};}
   if(m.type==='get-config')return {ok:true,...await configuration(true)};
   if(m.type==='popup-status'&&popup){const saved=await chrome.storage.local.get(['pairing','status','leagueStatus']);let appError=null,config=null;try{config=await configuration();}catch(e){appError=e.message;}return {ok:true,paired:!!saved.pairing,status:saved.status,leagueStatus:saved.leagueStatus||{},config,appError};}
-  if(m.type==='request-refresh'&&popup){await bridge('/refresh-request',{});return {ok:true};}
+  if(m.type==='request-refresh'&&popup){
+    const config=await configuration(true),tabs=await chrome.tabs.query({url:'https://basketball.fantasysports.yahoo.com/nba/*'});
+    const allowed=tabs.filter(tab=>{try{return config.leagues.some(l=>new URL(tab.url).pathname.startsWith('/nba/'+l.id+'/'));}catch{return false;}});
+    if(!allowed.length)throw Error('未发现已配置的 Yahoo 联盟页面。请打开自己的 My Team 后刷新网页。');
+    await bridge('/refresh-request',{});
+    let notified=0;
+    for(const tab of allowed){try{await chrome.tabs.sendMessage(tab.id,{type:'check-refresh'});notified++;}catch{}}
+    if(!notified)throw Error('Yahoo 页面尚未加载同步扩展。请在球队网页按 Ctrl+R（Mac 为 ⌘R）刷新，然后重试。');
+    return {ok:true};
+  }
   if(m.type==='current-team'&&popup)return {ok:true,context:await currentTeam()};
   if(m.type==='import-team'&&popup){
     const context=await currentTeam();
