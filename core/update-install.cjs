@@ -78,7 +78,7 @@ async function startInstall({platform,target,prepared,directory,parentPID=proces
   // interpolation or change to the system execution policy is needed.
   const args=platform==='darwin'?[helper,String(parentPID),target,staged,backup,ready,result,startAfter?'1':'0']:['-NoProfile','-NonInteractive','-File',helper,'-ParentProcess',String(parentPID),'-Target',target,'-Installer',staged,'-Backup',backup,'-Ready',ready,'-Result',result,'-ExpectedHash',prepared.installerHash,'-Start',startAfter?'1':'0'];
   const handle=await fs.open(log,'a',0o600);
-  const child=spawn(platform==='darwin'?'/bin/sh':path.join(process.env.SystemRoot||'C:\\Windows','System32/WindowsPowerShell/v1.0/powershell.exe'),args,{detached:true,windowsHide:true,stdio:['ignore',handle.fd,handle.fd]});
+  const child=spawn(platform==='darwin'?'/bin/sh':path.join(process.env.SystemRoot||'C:\\Windows','System32/WindowsPowerShell/v1.0/powershell.exe'),args,{detached:true,windowsHide:true,stdio:platform==='win32'?'ignore':['ignore',handle.fd,handle.fd]});
   try{
     await new Promise((resolve,reject)=>{child.once('spawn',resolve);child.once('error',reject);});child.unref();
     const deadline=Date.now()+15000;let found=false,exitInfo=null;child.once('exit',(code,signal)=>{exitInfo={code,signal};});
