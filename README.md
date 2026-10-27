@@ -8,9 +8,9 @@ Mac / Windows 桌面比分与 Yahoo Fantasy 篮球分析工具。读取使用者
 
 在本仓库的 [Releases](https://github.com/boringcoin/NBA-Fantasy-mini-app/releases) 下载测试包。完整 ZIP 包含安装程序、浏览器同步扩展和说明，解压后按说明安装。
 
-- [Windows x64 测试包](https://github.com/boringcoin/NBA-Fantasy-mini-app/releases/download/v2.0.1/ThunderFantasy-2.0.1-Windows-x64.zip)
-- [Mac Apple 芯片测试包](https://github.com/boringcoin/NBA-Fantasy-mini-app/releases/download/v2.0.1/ThunderFantasy-2.0.1-Mac-Apple.zip)
-- [Mac Intel 测试包](https://github.com/boringcoin/NBA-Fantasy-mini-app/releases/download/v2.0.1/ThunderFantasy-2.0.1-Mac-Intel.zip)
+- [Windows x64 测试包](https://github.com/boringcoin/NBA-Fantasy-mini-app/releases/download/v2.0.2/ThunderFantasy-2.0.2-Windows-x64.zip)
+- [Mac Apple 芯片测试包](https://github.com/boringcoin/NBA-Fantasy-mini-app/releases/download/v2.0.2/ThunderFantasy-2.0.2-Mac-Apple.zip)
+- [Mac Intel 测试包](https://github.com/boringcoin/NBA-Fantasy-mini-app/releases/download/v2.0.2/ThunderFantasy-2.0.2-Mac-Intel.zip)
 
 各平台安装文件对应如下：
 

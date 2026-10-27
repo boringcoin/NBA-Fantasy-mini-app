@@ -28,12 +28,14 @@ class PublishSafety(unittest.TestCase):
             output = root.parent / "outputs/ThunderFantasy-2.0.1"
             output.mkdir(parents=True)
             names = ["ThunderFantasy-2.0.1-" + name + ".zip" for name in ("Mac-Apple", "Mac-Intel", "Windows-x64", "Source")]
-            names += ["SHA256SUMS.txt", "使用说明.md", "验证记录.txt"]
+            names += ["SHA256SUMS.txt", "README_zh-CN.md", "VALIDATION.txt"]
             assets = []
             for name in names:
                 content = ("synthetic " + name).encode()
                 (output / name).write_bytes(content)
                 assets.append({"name": name, "size": len(content), "digest": "sha256:" + hashlib.sha256(content).hexdigest()})
+            for original, public_name in (("使用说明.md", "README_zh-CN.md"), ("验证记录.txt", "VALIDATION.txt")):
+                (output / original).write_bytes((output / public_name).read_bytes())
             if missing:
                 assets.pop()
             if wrong_size:

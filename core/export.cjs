@@ -1,11 +1,11 @@
 'use strict';
-const fs=require('node:fs/promises'),path=require('node:path'),crypto=require('node:crypto');
+const fs=require('node:fs/promises'),path=require('node:path');
 const ExcelJS=require('exceljs');
+const {withCSP}=require('./html.cjs');
 const {analyze,LABEL,value,compare,playerValues}=require('./analysis.cjs');
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const safeName=s=>String(s).replace(/[<>:"/\\|?*\x00-\x1f]/g,'_').replace(/[. ]+$/,'').slice(0,70)||'联盟';
 function datasets(snapshots,leagues=[]){return Object.values(snapshots).map(snapshot=>{const analysis=analyze(snapshot);return {snapshot:{...snapshot,leaguePower:snapshot.leaguePower?{...snapshot.leaguePower,matchupPairs:analysis.scheduleComplete?snapshot.leaguePower.matchupPairs:[]}:null},analysis,theme:leagues.find(l=>l.id===snapshot.leagueID)?.theme||'white'};}).filter(d=>d.analysis.rows.length);}
-function withCSP(html){const hashes=[...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)].map(m=>`'sha256-${crypto.createHash('sha256').update(m[1]).digest('base64')}'`).join(' ');return html.replace('<head>',`<head><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src ${hashes}; style-src 'unsafe-inline'; img-src data:; connect-src 'none'; base-uri 'none'; form-action 'none'">`);}
 async function reportHTML(data){if(!data.length)throw Error('尚无完整全盟数据，请连接扩展并手动刷新');const template=await fs.readFile(path.join(__dirname,'../assets/report.html'),'utf8');const json=JSON.stringify({leagues:data}).replace(/[<>&\u2028\u2029]/g,c=>'\\u'+c.charCodeAt(0).toString(16).padStart(4,'0'));return withCSP(template.replace('__REPORT_DATA__',()=>json));}
 const fmt=(n,k)=>n==null?'—':['FG%','FT%'].includes(k)?(n*100).toFixed(2)+'%':Number.isInteger(n)?String(n):n.toFixed(k==='A/T'?3:1);
 function tables(d){

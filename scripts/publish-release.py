@@ -53,7 +53,10 @@ def main():
     subprocess.run([sys.executable, str(project / "scripts/package-delivery.py"), "--verification", str(verification)], cwd=project, check=True)
     output = project.parent / "outputs" / ("ThunderFantasy-" + version)
     expected = {"ThunderFantasy-{}-{}.zip".format(version, x) for x in ("Mac-Apple", "Mac-Intel", "Windows-x64", "Source")}
-    expected.update(("SHA256SUMS.txt", "使用说明.md", "验证记录.txt"))
+    # Release attachment names use ASCII for consistent URLs across clients.
+    for original, public_name in (("使用说明.md", "README_zh-CN.md"), ("验证记录.txt", "VALIDATION.txt")):
+        shutil.copyfile(output / original, output / public_name)
+    expected.update(("SHA256SUMS.txt", "README_zh-CN.md", "VALIDATION.txt"))
     files = [output / name for name in sorted(expected)]
     if any(not file.is_file() or file.is_symlink() for file in files):
         raise RuntimeError("Missing release asset")
@@ -97,7 +100,7 @@ def main():
             if digest != "sha256:" + checksum:
                 raise RuntimeError("Release asset checksum mismatch: " + file.name)
     gh("release", "edit", tag, "--repo", repo, "--draft=false", "--prerelease")
-    print("Published complete test release: " + release["html_url"])
+    print("Published complete test release: https://github.com/{}/releases/tag/{}".format(repo, tag))
 
 
 if __name__ == "__main__":
