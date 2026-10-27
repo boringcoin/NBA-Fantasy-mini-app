@@ -83,7 +83,7 @@ npm run dist:win -- --publish never
 
 仓库上传后，进入 **Actions → Build Mac and Windows → Run workflow**。也可以推送与 `package.json` 版本相同的 `v版本号` 标签触发。工作流分别使用 Mac Apple、Mac Intel 和 Windows 原生运行环境执行测试、桌面导出验证及打包。
 
-运行成功后从该次 Actions 页面下载三个安装包产物和 `ThunderFantasy-BrowserExtension-and-Docs`。发布者测试后，可以手动上传到一个 GitHub Release，方便其他人下载。工作流只生成构建产物，不会自动创建 Release，也不需要上传 Yahoo 密钥或登录信息。Actions 产物保留 30 天，长期分发请使用 Releases。
+运行成功后从该次 Actions 页面下载三个安装包产物和 `ThunderFantasy-BrowserExtension-and-Docs`。手动运行只生成构建产物。推送与 package.json 版本一致的 v版本号 标签后，工作流会在三个平台测试和构建全部成功后，自动打包包含安装程序、浏览器扩展和说明的三个 ZIP，并发布到该版本的测试版 Release，同时附上源码包与 SHA-256 校验清单。发布先创建草稿，所有附件上传并核对完整后才公开。只有发布任务临时拥有当前仓库的写权限，不需要个人 GitHub 令牌或 Yahoo 登录信息。Actions 产物保留 30 天，Releases 用于长期分发。
 
 工作流定义参考 [GitHub Actions 工作流语法](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax) 与 [官方运行环境说明](https://docs.github.com/en/actions/reference/runners/github-hosted-runners)。
 

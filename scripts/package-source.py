@@ -16,7 +16,7 @@ DIRECTORIES = {
     "core": {".cjs"},
     "extension": {".js", ".json", ".html"},
     "scripts": {".cjs", ".py"},
-    "test": {".cjs"},
+    "test": {".cjs", ".py"},
     ".github/workflows": {".yml", ".yaml"},
 }
 ASSETS = ("assets/report.html", "assets/Thunder.icns", "assets/icon.ico", "assets/icon.png")

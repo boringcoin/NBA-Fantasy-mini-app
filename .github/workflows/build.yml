@@ -5,7 +5,7 @@ on:
   push:
     tags: ['v*']
 
-# Builds upload downloadable workflow artifacts; they never create a Release or push code.
+# Manual runs build artifacts. Version tags also publish complete test bundles.
 permissions:
   contents: read
 
@@ -97,3 +97,27 @@ jobs:
             使用说明.md
           if-no-files-found: error
           retention-days: 30
+
+  publish:
+    name: Publish complete test bundles
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs: [build, extension-and-docs]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - name: Download this run's installers
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --pattern 'ThunderFantasy-*' --dir artifacts
+      - name: Verify publication safeguards
+        run: python3 -m unittest discover -s test -p '*_test.py' -v
+      - name: Package and publish versioned downloads
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/publish-release.py --artifacts artifacts
