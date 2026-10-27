@@ -1,7 +1,7 @@
 Thunder Fantasy 安装与连接教程（Mac / Windows）
 
 一、下载
-打开：https://github.com/boringcoin/NBA-Fantasy-mini-app/releases/tag/v2.0.7
+打开：https://github.com/boringcoin/NBA-Fantasy-mini-app/releases/tag/v2.0.8
 在 Assets（附件）中按电脑选择：
 • Mac Apple 芯片（M1/M2/M3/M4 等）：Mac-Apple.zip
 • Windows 10/11 64 位：Windows-x64.zip
@@ -38,11 +38,11 @@ Windows：右键 ZIP → 全部解压 → 打开解压后的文件夹 → 双击
 五、日常使用
 • 当前版本需要手动安装更新；联盟与配对保留。
 • 同步时保持桌面应用运行、浏览器登录 Yahoo，并保留一个已配置的 Yahoo 联盟标签页。
-• 每 10 分钟更新今天有比赛的自有球员和本周全盟战力；点击“刷新”可补取历史周和完整球员数据。
+• 每 10 分钟更新今天有比赛的自有球员；全盟战力每天北京时间 16:00 后更新一次，点击“刷新”可立即更新。
 • 不要移动或删除 YahooSync 文件夹，否则扩展可能失效。
 • 不需要安装 Codex、Python 或 Node.js，也不需要提供 Yahoo 密码或 API Key 给应用。
 
-旧版更新到 2.0.7：
+旧版更新到 2.0.8：
 安装新应用，并将新包 YahooSync 中的全部文件覆盖原扩展目录；在扩展管理页重新加载扩展，刷新所有 Yahoo 联盟页面。原有联盟配置保留。
 
 系统拦截提示的官方说明：

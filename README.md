@@ -10,8 +10,8 @@ Mac / Windows 桌面比分与 Yahoo Fantasy 篮球分析工具。读取使用者
 
 在本仓库的 [Releases](https://github.com/boringcoin/NBA-Fantasy-mini-app/releases) 下载测试包。完整 ZIP 包含安装程序、浏览器同步扩展和说明，解压后按说明安装。
 
-- [Windows x64 测试包](https://github.com/boringcoin/NBA-Fantasy-mini-app/releases/download/v2.0.7/ThunderFantasy-2.0.7-Windows-x64.zip)
-- [Mac Apple 芯片测试包](https://github.com/boringcoin/NBA-Fantasy-mini-app/releases/download/v2.0.7/ThunderFantasy-2.0.7-Mac-Apple.zip)
+- [Windows x64 测试包](https://github.com/boringcoin/NBA-Fantasy-mini-app/releases/download/v2.0.8/ThunderFantasy-2.0.8-Windows-x64.zip)
+- [Mac Apple 芯片测试包](https://github.com/boringcoin/NBA-Fantasy-mini-app/releases/download/v2.0.8/ThunderFantasy-2.0.8-Mac-Apple.zip)
 
 各平台安装文件对应如下：
 
@@ -30,13 +30,13 @@ Mac / Windows 桌面比分与 Yahoo Fantasy 篮球分析工具。读取使用者
 
 也可以在应用手动填写联盟 ID 和球队 ID。网页导入只针对当前打开的球队页，不会扫描账号中的所有联盟；请确认打开的是自己的球队。同一联盟换球队请在桌面设置中修改。
 
-自动同步需要应用运行、Yahoo 保持登录并保留一个已配置联盟标签页。每 10 分钟更新当天有比赛的自有球员；手动刷新更新球员场均和全盟统计。每周自动导出未启用。
+自动同步需要应用运行、Yahoo 保持登录并保留一个已配置联盟标签页。每 10 分钟更新当天有比赛的自有球员；全盟战力每天北京时间 16:00 后更新一次，手动刷新可立即更新。每周自动导出未启用。
 
 完整安装、统计口径和导出操作见 [使用说明](使用说明.md)。
 
 ## 功能
 
-- 应用内自动更新仍在开发验证中；当前 2.0.7 版本需手动安装。
+- 应用内自动更新仍在开发验证中；当前 2.0.8 版本需手动安装。
 
 - 雷霆比分、三日赛程、实时战报、双方球员数据；窗口可调大小。
 - 多联盟切换，近 14 天及本赛季场均、GP、当前比赛日统计。
