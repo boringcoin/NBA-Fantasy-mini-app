@@ -69,7 +69,7 @@
             if(parsed.teams.length!==2)throw Error('历史对局不完整');
             const power=await leaguePower(league,doc,{week:'Week '+prior,teams:parsed.teams},false);
             if(power.error)throw Error(power.error);
-            result.priorWeeks.push({week:power.week,teams:power.teams,expectedTeamCount:power.expectedTeamCount,matchupPairs:power.matchupPairs});
+            result.priorWeeks.push({week:power.week,teams:power.teams,expectedTeamCount:power.expectedTeamCount,matchupPairs:power.matchupPairs,updatedAt:power.updatedAt});
           } catch(e) {errors.push('Week '+prior+'：'+String(e.message||e));}
         }
         result.historyError=errors.length?errors.join('；').slice(0,900):null;
@@ -94,7 +94,9 @@
         if(matchup.teams.length!==2||!matchup.teams.some(t=>t.id===league.team))throw Error('未识别到这支球队的本周对局；阵容仍可查看，请核对球队 ID 或稍后重试');
       }
     } catch(error) {matchupError=String(error.message||error);matchup=null;}
-    const base={league:league.name,leagueID:league.id,teamID:league.team,week:(matchDoc?.body.textContent.match(/Week\s+\d+/)||rosterDoc.body.textContent.match(/Week\s+\d+/)||[])[0]||'本周',receivedAt:new Date().toISOString(),columns:(matchup||roster).columns,teams:matchup?.teams||[],players:roster.players,source:matchupURL.href,matchupError};
+    const years=Array.from(rosterDoc.querySelectorAll('a[href]')).map(a=>(a.textContent||'').trim().match(/^(20\d{2})[-–]\d{2}(?:\s+Season)?$/i)).filter(Boolean).map(m=>Number(m[1]));
+    const seasonYear=years.length?Math.max(...years):new Date().getFullYear()-(new Date().getMonth()<8?1:0);
+    const base={league:league.name,leagueID:league.id,teamID:league.team,seasonYear,week:(matchDoc?.body.textContent.match(/Week\s+\d+/)||rosterDoc.body.textContent.match(/Week\s+\d+/)||[])[0]||'本周',receivedAt:new Date().toISOString(),columns:(matchup||roster).columns,teams:matchup?.teams||[],players:roster.players,source:matchupURL.href,matchupError};
     if(todayOnly) {
       const playing=roster.players.filter(hasGameToday);
       const ids=new Set(playing.map(p=>p.id));
@@ -104,8 +106,6 @@
       if(ids.size)base.recentUpdates=YahooParser.fromDocument(await get(rosterURL(league,'AL14'))).players.filter(p=>ids.has(p.id));
       await send(base);if(matchupError)throw Error(matchupError);return;
     }
-    const years=Array.from(rosterDoc.querySelectorAll('a[href]')).map(a=>(a.textContent||'').trim().match(/^(20\d{2})[-–]\d{2}(?:\s+Season)?$/i)).filter(Boolean).map(m=>Number(m[1]));
-    const seasonYear=years.length?Math.max(...years):new Date().getFullYear()-(new Date().getMonth()<8?1:0);
     base.syncScope='full';
     await send(base);
     try {

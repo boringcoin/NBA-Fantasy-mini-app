@@ -10,9 +10,9 @@ Mac / Windows 桌面比分与 Yahoo Fantasy 篮球分析工具。读取使用者
 
 在本仓库的 [Releases](https://github.com/boringcoin/NBA-Fantasy-mini-app/releases) 下载测试包。完整 ZIP 包含安装程序、浏览器同步扩展和说明，解压后按说明安装。
 
-- [Windows x64 测试包](https://github.com/boringcoin/NBA-Fantasy-mini-app/releases/download/v2.0.5/ThunderFantasy-2.0.5-Windows-x64.zip)
-- [Mac Apple 芯片测试包](https://github.com/boringcoin/NBA-Fantasy-mini-app/releases/download/v2.0.5/ThunderFantasy-2.0.5-Mac-Apple.zip)
-- [Mac Intel 测试包](https://github.com/boringcoin/NBA-Fantasy-mini-app/releases/download/v2.0.5/ThunderFantasy-2.0.5-Mac-Intel.zip)
+- [Windows x64 测试包](https://github.com/boringcoin/NBA-Fantasy-mini-app/releases/download/v2.0.6/ThunderFantasy-2.0.6-Windows-x64.zip)
+- [Mac Apple 芯片测试包](https://github.com/boringcoin/NBA-Fantasy-mini-app/releases/download/v2.0.6/ThunderFantasy-2.0.6-Mac-Apple.zip)
+- [Mac Intel 测试包](https://github.com/boringcoin/NBA-Fantasy-mini-app/releases/download/v2.0.6/ThunderFantasy-2.0.6-Mac-Intel.zip)
 
 各平台安装文件对应如下：
 
@@ -42,6 +42,7 @@ Mac / Windows 桌面比分与 Yahoo Fantasy 篮球分析工具。读取使用者
 - 多联盟切换，近 14 天及本赛季场均、GP、当前比赛日统计。
 - 每项按联盟人数分配排名分：12 人联盟第一 12 分、第二 11 分，并列平分所占名次。
 - 全员两两对战、真实当周对局、以中位数为基准的走位、对手爆种／失常和单项险胜。
+- “盟内战力 → 统计周次”可切换上周等已同步周次；历史完整数据保存在本机。交互报告也可换周，支持按所选周导出。
 - 球员价值和可选自由球员参考，结合样本、位置及 Yahoo 当前伤停标记。
 - 离线 HTML 报告可排序、筛选、切换背景，另可导出 Excel 和五类图表。
 

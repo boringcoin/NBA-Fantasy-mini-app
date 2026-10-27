@@ -1,6 +1,7 @@
 'use strict';
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
 const {KEYS}=require('./analysis.cjs');
+const {mergePowerHistory,season}=require('./weeks.cjs');
 const numeric=v=>typeof v==='string'&&/^\d{1,10}$/.test(v);
 function validateLeagues(input){
   if(!Array.isArray(input)||input.length>12)throw Error('最多配置 12 个联盟');
@@ -18,19 +19,20 @@ function validateSnapshot(data,leagues){
   for(const research of [data.research,data.dailyResearch])if(research)for(const key of ['recent','prior','season','available'])if(research[key])validatePeople(research[key],180);
   if(data.recentUpdates)validatePeople(data.recentUpdates,80);
   if(data.leaguePower){validatePeople(data.leaguePower.teams,24);if((data.leaguePower.priorWeeks||[]).length>4)throw Error('历史周次过多');for(const week of data.leaguePower.priorWeeks||[])validatePeople(week.teams,24);}
+  if(data.powerHistory){if(!Array.isArray(data.powerHistory)||data.powerHistory.length>40)throw Error('历史周次过多');for(const week of data.powerHistory)validatePeople(week.teams,24);}
   const source=new URL(data.source);if(source.origin!=='https://basketball.fantasysports.yahoo.com'||!source.pathname.startsWith('/nba/'+league.id+'/'))throw Error('无效数据来源');
   return {...data,league:league.name,receivedAt:new Date().toISOString()};
 }
 function mergeSnapshot(previous,next){
-  if(!previous)return next;
+  if(!previous||previous.teamID!==next.teamID||(season(previous)&&season(next)&&season(previous)!==season(next)))return {...next,powerHistory:mergePowerHistory(null,next)};
   const merged={...previous,...next};
-  if(previous.teamID!==next.teamID)return next;
   if(next.research)merged.research={...(previous.research||{}),...next.research};
   if(next.syncScope==='today'){
     const owned=new Set(next.players.map(p=>p.id)),updates=new Map((next.recentUpdates||[]).map(p=>[p.id,p]));
     const recent=new Map((previous.research?.recent||[]).filter(p=>owned.has(p.id)).map(p=>[p.id,p]));for(const [id,p] of updates)if(owned.has(id))recent.set(id,p);
     merged.research={...(previous.research||{}),recent:[...recent.values()]};
   }
+  merged.powerHistory=mergePowerHistory(previous,next);
   return merged;
 }
 class State {
