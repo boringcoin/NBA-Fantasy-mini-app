@@ -2,7 +2,10 @@
 importScripts('team-context.js','sync-coordinator.js');
 const BASE='http://127.0.0.1:18747';
 let coordinator,configCache=null,coordination=Promise.resolve();
-const ready=chrome.storage.session.get('coordinator').then(v=>{coordinator=new ThunderSyncCoordinator(v.coordinator);});
+const ready=Promise.all([chrome.storage.session.get('coordinator'),chrome.storage.local.get('dailyByLeague')]).then(([session,local])=>{
+  coordinator=new ThunderSyncCoordinator(session.coordinator);
+  coordinator.daily={...coordinator.daily,...local.dailyByLeague};
+});
 function serial(fn){const result=coordination.then(fn,fn);coordination=result.catch(()=>{});return result;}
 async function saveCoordinator(){await chrome.storage.session.set({coordinator:coordinator.saved()});}
 async function leagueStatus(id,state,error=''){
@@ -66,6 +69,7 @@ async function message(m,sender){
       const lease=coordinator.acquire(leagueID,sender.tab.id,{requestID:m.requestID,todayOnly:m.todayOnly,daily:m.daily,day:dailyDay()});
       if(!lease)return {ok:false};
       await saveCoordinator();await leagueStatus(leagueID,'started');
+      if(lease.day)await chrome.storage.local.set({dailyByLeague:coordinator.daily});
       if(m.requestID)await bridge('/refresh-status',{requestID:m.requestID,state:'started'}).catch(()=>{});
       return {ok:true,leaseID:lease.leaseID};
     }

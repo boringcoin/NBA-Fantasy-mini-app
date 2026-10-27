@@ -21,6 +21,7 @@
         if(options.daily&&(!options.day||this.daily[id]===options.day))return null;
       }
       const lease={tab,time:now,leaseID:String(now)+'-'+(++this.sequence),requestID:options.requestID||null,todayOnly:!!options.todayOnly,day:options.daily?options.day:null};
+      if(lease.day)this.daily[id]=lease.day;
       this.leases[id]=lease;return lease;
     }
     owns(id,tab,leaseID){const l=this.leases[id];return !!l&&l.tab===tab&&l.leaseID===leaseID;}

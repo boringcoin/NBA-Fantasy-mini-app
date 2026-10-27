@@ -30,6 +30,8 @@ test('daily work is once per league, not once for the browser',()=>{
   const c=new Coordinator(),o={daily:true,day:'2026-10-27'};
   const a=c.acquire('90001',1,o);c.finish('90001',1,a.leaseID);
   assert.equal(c.acquire('90001',2,o),null);assert.ok(c.acquire('90002',2,o));
+  const restarted=new Coordinator({daily:structuredClone(c.daily)});
+  assert.equal(restarted.acquire('90001',3,o),null);assert.equal(restarted.acquire('90002',3,o),null);
 });
 function harness({matchupMissing=false}={}){
   const command={requestID:'two-pages',scope:'full'},snapshots=[],acks=[],local={pairing:{token:'test',clientID:'test'}},session={};let activeCommand=command;
