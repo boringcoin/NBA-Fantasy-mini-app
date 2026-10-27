@@ -7,6 +7,12 @@ async function run(file,args){return new Promise((resolve,reject)=>{const child=
 async function waitFor(file,expected){const end=Date.now()+180000;while(Date.now()<end){try{const text=(await fs.readFile(file,'utf8')).trim();if(text===expected)return;if(text.startsWith('failed'))throw Error(text);}catch(e){if(e.code!=='ENOENT')throw e;}await new Promise(r=>setTimeout(r,300));}throw Error('Update helper timed out: '+file);}
 async function main(){
   assert.ok((platform==='darwin'&&arch==='arm64')||(platform==='win32'&&arch==='x64'));
+  if(platform==='win32'){
+    const ps=path.join(process.env.SystemRoot||'C:\\Windows','System32/WindowsPowerShell/v1.0/powershell.exe');
+    const output=await run(ps,['-NoProfile','-NonInteractive','-Command','[Console]::Out.WriteLine("THUNDER_PS_OK")']);
+    if(!output.includes('THUNDER_PS_OK'))throw Error('Windows PowerShell did not execute the diagnostic command: '+JSON.stringify(output));
+  }
+
   const label=platform==='win32'?'Windows-x64':'Mac-Apple',suffix=platform==='win32'?'win-x64.exe':`mac-${arch}.dmg`;
   const root=path.resolve('.smoke/update'),cache=path.join(root,'cache'),zipName=`ThunderFantasy-${version}-${label}.zip`,installerName=`ThunderFantasy-${version}-${suffix}`;
   await fs.mkdir(root,{recursive:true});
