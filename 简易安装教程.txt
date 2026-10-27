@@ -1,0 +1,47 @@
+Thunder Fantasy 安装与连接教程（Mac / Windows）
+
+一、下载
+打开：https://github.com/boringcoin/NBA-Fantasy-mini-app/releases/tag/v2.0.2
+在 Assets（附件）中按电脑选择：
+• Mac Apple 芯片（M1/M2/M3/M4 等）：Mac-Apple.zip
+• Mac Intel 芯片：Mac-Intel.zip
+• Windows 10/11 64 位：Windows-x64.zip
+Mac 可在苹果菜单 → 关于本机查看芯片。Mac 需要 macOS 13 或更新版本。
+下载的是完整 ZIP 测试包，不需要下载页面自动附带的 Source code。
+
+二、安装应用
+Mac：解压 ZIP → 打开里面的 DMG → 把 Thunder Fantasy 拖到 Applications（应用程序）→ 从应用程序打开。
+若提示无法验证开发者，确认文件来自上面的仓库后，先尝试打开一次，再去“系统设置 → 隐私与安全性 → 仍要打开”。
+
+Windows：右键 ZIP → 全部解压 → 打开解压后的文件夹 → 双击里面的 EXE，按提示安装。
+若出现“Windows 已保护你的电脑”，确认文件来自上面的仓库后，可点“更多信息 → 仍要运行”。
+
+三、安装浏览器同步扩展（两个系统相同）
+1. 使用 Edge 或 Chrome，把解压后的 YahooSync 文件夹保存在固定位置。
+2. 在浏览器地址栏输入：
+   Edge：edge://extensions/
+   Chrome：chrome://extensions/
+3. 开启“开发人员模式” → 点击“加载解压缩的扩展” → 选择 YahooSync 文件夹。
+   这个文件夹里应能直接看到 manifest.json；不要选择 ZIP 文件。
+4. 安装后刷新一次 Yahoo 网页。
+
+四、连接自己的雅虎球队
+1. 在同一个浏览器登录自己的 Yahoo，进入自己的 NBA 球队 My Team 页面。
+2. 打开桌面应用 → 设置与配对 → 生成配对码。
+3. 点击浏览器工具栏的扩展按钮，找到“Thunder Fantasy 本机同步”，输入六位配对码并连接。配对码三分钟内有效。
+4. 核对显示的球队信息，点击“导入当前球队”，等待首次同步完成。
+5. 若没有出现数据，点击扩展里的“立即同步球员与全盟数据”。
+多个联盟：分别打开每个联盟里自己的 My Team，再各导入一次，之后可在应用内切换。
+
+如果网页无法自动识别球队：
+可在桌面“设置与配对”手动添加。例如球队网址 /nba/12345/6 对应联盟 ID 12345、球队 ID 6。保存后再点扩展“立即同步”。
+
+五、日常使用
+• 同步时保持桌面应用运行、浏览器登录 Yahoo，并保留一个已配置的 Yahoo 联盟标签页。
+• 每 10 分钟自动更新今天有比赛的自有球员；点击“刷新”可更新完整球员和联盟数据。
+• 不要移动或删除 YahooSync 文件夹，否则扩展可能失效。
+• 不需要安装 Codex、Python 或 Node.js，也不需要提供 Yahoo 密码或 API Key 给应用。
+
+系统拦截提示的官方说明：
+Apple：https://support.apple.com/zh-cn/102445
+Microsoft：https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/publish-first-app

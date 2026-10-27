@@ -6,6 +6,8 @@ Mac / Windows 桌面比分与 Yahoo Fantasy 篮球分析工具。读取使用者
 
 ## 下载和连接自己的球队
 
+首次使用请看 [Mac / Windows 简易安装教程](简易安装教程.txt)，包含下载安装、浏览器扩展配对和导入自己的 Yahoo 球队，可直接转发给朋友。
+
 在本仓库的 [Releases](https://github.com/boringcoin/NBA-Fantasy-mini-app/releases) 下载测试包。完整 ZIP 包含安装程序、浏览器同步扩展和说明，解压后按说明安装。
 
 - [Windows x64 测试包](https://github.com/boringcoin/NBA-Fantasy-mini-app/releases/download/v2.0.2/ThunderFantasy-2.0.2-Windows-x64.zip)
