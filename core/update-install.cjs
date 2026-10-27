@@ -78,15 +78,15 @@ async function startInstall({platform,target,prepared,directory,parentPID=proces
   // UTF-16 command encoding preserves Unicode paths; only base64 JSON is dynamic.
   // This executes fixed commands, without changing PowerShell execution policy.
   const json=Buffer.from(JSON.stringify(parameters),'utf8').toString('base64');
-  const command="$p=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('"+json+"')) | ConvertFrom-Json; $values=@{}; $p.PSObject.Properties | ForEach-Object {$values[$_.Name]=$_.Value}; & {"+WINDOWS+"} @values";
+  const command="$p=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('"+json+"')) | ConvertFrom-Json; & {"+WINDOWS+"} -ParentProcess $p.ParentProcess -Target $p.Target -Installer $p.Installer -Backup $p.Backup -Ready $p.Ready -Result $p.Result -ExpectedHash $p.ExpectedHash -Start $p.Start";
   const args=platform==='darwin'?[helper,String(parentPID),target,staged,backup,ready,result,startAfter?'1':'0']:['-NoProfile','-NonInteractive','-EncodedCommand',Buffer.from(command,'utf16le').toString('base64')];
   const handle=await fs.open(log,'a',0o600);
   const child=spawn(platform==='darwin'?'/bin/sh':path.join(process.env.SystemRoot||'C:\\Windows','System32/WindowsPowerShell/v1.0/powershell.exe'),args,{detached:true,windowsHide:true,stdio:['ignore',handle.fd,handle.fd]});
   try{
     await new Promise((resolve,reject)=>{child.once('spawn',resolve);child.once('error',reject);});child.unref();
-    const deadline=Date.now()+15000;let found=false;
-    while(Date.now()<deadline){try{await fs.access(ready);found=true;break;}catch{await new Promise(r=>setTimeout(r,100));}}
-    if(!found){const details=await fs.readFile(log,'utf8').catch(()=>'');throw Error('更新安装器未能启动；原应用保持不变。'+details.slice(-4000));}
+    const deadline=Date.now()+15000;let found=false,exitInfo=null;child.once('exit',(code,signal)=>{exitInfo={code,signal};});
+    while(Date.now()<deadline){try{await fs.access(ready);found=true;break;}catch{if(exitInfo)break;await new Promise(r=>setTimeout(r,100));}}
+    if(!found){const details=await fs.readFile(log,'utf8').catch(()=>'');throw Error('更新安装器未能启动；原应用保持不变。'+JSON.stringify(exitInfo)+' '+details.slice(-4000));}
     await fs.writeFile(path.join(directory,'pending.json'),JSON.stringify(record),{mode:0o600});return record;
   }finally{await handle.close();}
 }
