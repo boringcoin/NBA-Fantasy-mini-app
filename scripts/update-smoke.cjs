@@ -38,7 +38,14 @@ async function main(){
     if(!await fs.access(marker).then(()=>true,()=>false))throw Error('Direct PowerShell -File failed to create marker; output='+JSON.stringify(result));
   }
   let record;
-  try{record=await startInstall({platform,target,prepared,directory:cache,parentPID:old.pid,startAfter:false});}finally{old.kill();}
+  try{record=await startInstall({platform,target,prepared,directory:cache,parentPID:old.pid,startAfter:false});}
+  catch(error){
+    if(platform==='win32'){
+      console.error('Stage entries:',await fs.readdir(prepared.stage));
+      for(const name of ['install.ps1','install.log','ready','result']){try{console.error(name+':',JSON.stringify((await fs.readFile(path.join(prepared.stage,name))).toString('utf8')));}catch(e){console.error(name+':',e.code);}}
+    }
+    throw error;
+  }finally{old.kill();}
   await waitFor(record.result,'installed');assert.equal(await fs.readFile(sentinel,'utf8'),'keep league and pairing');
   const result=await run(exe,['--smoke-test','--data-dir',path.join(root,'profile'),'--input',path.resolve('.smoke/input.json'),'--smoke-output',path.join(root,'new-app-output')]);
   assert.match(result,/SMOKE_OK/);await finishInstall(cache,version,target);await assert.rejects(fs.access(record.backup));
