@@ -2,6 +2,7 @@
 const {app,BrowserWindow,ipcMain,Menu,dialog,shell,protocol,session,net}=require('electron');
 const fs=require('node:fs/promises'),path=require('node:path');
 const {State}=require('../core/state.cjs'),{createBridge}=require('../core/bridge.cjs'),{analyze,playerValues}=require('../core/analysis.cjs'),exportsCore=require('../core/export.cjs'),{dayKey,scoreboardDays}=require('../core/score.cjs');
+const {Updater,pruneCache}=require('../core/update.cjs'),{startInstall,finishInstall}=require('../core/update-install.cjs'),{managedExtension}=require('../core/extension-files.cjs');
 const {availableWeeks,powerSnapshot}=require('../core/weeks.cjs');
 protocol.registerSchemesAsPrivileged([{scheme:'app',privileges:{standard:true,secure:true,supportFetchAPI:true}}]);
 const args=process.argv.slice(1),argument=name=>{const i=args.indexOf(name);return i<0?null:args[i+1];},smoke=args.includes('--smoke-test'),exportPath=argument('--export');
@@ -9,8 +10,9 @@ app.setName('Thunder Fantasy');
 if(process.platform==='win32')app.setAppUserModelId('app.thunderfantasy.desktop');
 if(smoke&&argument('--data-dir'))app.setPath('userData',path.resolve(argument('--data-dir')));
 if(!exportPath&&!smoke&&!app.requestSingleInstanceLock()){app.quit();}else{
+let updater,managed,updateTimer,updateInterval,installing=false;
 let win,state,bridge,reportWindows=new Set(),exporting=false,score={events:[],featured:null,summary:null,updatedAt:null,error:null},scoreBusy=false,summaryID=null,scoreTimer,scheduleCache=null;
-function status(){return {...state.public(),score,powerWeeks:Object.fromEntries(Object.entries(state.data.snapshots).map(([id,s])=>[id,availableWeeks(s)])),analyses:Object.fromEntries(Object.entries(state.data.snapshots).map(([id,s])=>[id,analyze(s)]))};}
+function status(){return {...state.public(),updater:updater?.state,managedExtension:managed?.directory,score,powerWeeks:Object.fromEntries(Object.entries(state.data.snapshots).map(([id,s])=>[id,availableWeeks(s)])),analyses:Object.fromEntries(Object.entries(state.data.snapshots).map(([id,s])=>[id,analyze(s)]))};}
 function changed(){if(win&&!win.isDestroyed())win.webContents.send('changed',status());}
 async function requestJSON(url){const response=await net.fetch(url,{signal:AbortSignal.timeout(15000),headers:{'Accept':'application/json'}});if(!response.ok)throw Error('比分数据暂不可用（'+response.status+'）');return response.json();}
 async function summary(id){if(!/^\d+$/.test(id))throw Error('比赛 ID 无效');return requestJSON('https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event='+id);}
@@ -38,10 +40,27 @@ function windowOptions(extra={}){return {width:1200,height:850,minWidth:440,minH
 function guardWindow(w){w.webContents.setWindowOpenHandler(({url})=>{openExternal(url);return {action:'deny'};});w.webContents.on('will-navigate',(e,url)=>{if(!url.startsWith('app://desktop/')){e.preventDefault();openExternal(url);}});w.webContents.on('will-attach-webview',e=>e.preventDefault());}
 function openExternal(url){try{const u=new URL(url);if(u.protocol==='https:'&&u.hostname==='basketball.fantasysports.yahoo.com'&&/^\/nba(?:\/|$)/.test(u.pathname))shell.openExternal(u.href);}catch{}}
 async function capture(html,file,width){const w=new BrowserWindow({width,height:900,show:false,useContentSize:true,enableLargerThanScreen:true,webPreferences:{contextIsolation:true,nodeIntegration:false,sandbox:true,webSecurity:true}});try{await w.loadURL('data:text/html;charset=utf-8,'+encodeURIComponent(html));await w.webContents.executeJavaScript('document.fonts.ready.then(()=>true)');const height=Math.min(12000,Math.ceil(await w.webContents.executeJavaScript('document.documentElement.scrollHeight')));w.setContentSize(width,height);await new Promise(r=>setTimeout(r,100));const img=await w.webContents.capturePage();await fs.writeFile(file,img.toPNG());}finally{w.destroy();}}
-async function doExport(outDir,selection){if(exporting)throw Error('正在导出，请稍候');exporting=true;try{return await exportsCore.exportBundle({snapshots:state.data.snapshots,leagues:state.data.leagues,outDir,capture,selection});}finally{exporting=false;}}
+async function doExport(outDir,selection){if(installing)throw Error('正在准备更新，请稍后导出');if(exporting)throw Error('正在导出，请稍候');exporting=true;try{return await exportsCore.exportBundle({snapshots:state.data.snapshots,leagues:state.data.leagues,outDir,capture,selection});}finally{exporting=false;}}
 function wireIPC(){
   function handle(name,fn){ipcMain.handle(name,async(event,...values)=>{if(event.sender!==win?.webContents||event.senderFrame?.url!=='app://desktop/index.html')throw Error('页面无权调用此功能');return fn(...values);});}
   handle('get-state',()=>status());
+  handle('update-action',async(action,value)=>{
+    if(action==='auto'){await updater.setAuto(value);return updater.state;}
+    if(action==='check')return updater.check();
+    if(action==='download')return updater.download();
+    if(action==='extension'){await shell.openPath(managed.directory);return true;}
+    if(action==='files'){await shell.openPath(updater.directory);return true;}
+    if(action!=='install')throw Error('未知的更新操作');
+    if(!app.isPackaged||smoke)throw Error('只有已安装的应用可以执行更新');
+    if(exporting||installing)throw Error('正在处理导出或更新，请稍后重试');
+    if(updater.state.phase!=='ready')throw Error('请先完成更新下载');
+    installing=true;updater.emit({phase:'preparing',error:''});
+    try{
+      const prepared=await updater.prepare(),target=process.platform==='darwin'?path.resolve(path.dirname(process.execPath),'../..'):path.dirname(process.execPath);
+      await startInstall({platform:process.platform,target,prepared,directory:updater.directory});
+      state.save();app.quit();return true;
+    }catch(e){installing=false;updater.emit({phase:'ready',error:'更新未能安装：'+e.message+'。原有数据和应用保留，可打开更新文件重试。'});throw e;}
+  });
   handle('configure',leagues=>{state.configure(leagues);if(!state.data.leagues.some(l=>l.id===state.data.selectedLeague))state.data.selectedLeague=state.data.leagues[0]?.id||null;state.save();changed();return status();});
   handle('select-league',id=>{if(!state.data.leagues.some(l=>l.id===id))throw Error('联盟未配置');state.data.selectedLeague=id;state.save();return status();});
   handle('new-code',()=>state.newCode());
@@ -55,9 +74,11 @@ function wireIPC(){
   handle('open-report',async(selection={})=>{if(!exportsCore.datasets(state.data.snapshots,[],{allWeeks:true}).length)throw Error('请先手动刷新，收齐全盟数据');const w=new BrowserWindow(windowOptions({width:1450,height:950,title:'全盟交互报告',webPreferences:{contextIsolation:true,nodeIntegration:false,sandbox:true,webSecurity:true}}));guardWindow(w);reportWindows.add(w);w.on('closed',()=>reportWindows.delete(w));await w.loadURL('app://desktop/report.html?'+new URLSearchParams({leagueID:selection?.leagueID||'',week:selection?.week||''}));w.show();return true;});
   handle('export',async(selection)=>{if(selection)powerSnapshot(state.data.snapshots[selection.leagueID],selection.week);const chosen=await dialog.showOpenDialog(win,{title:'选择报告保存位置',properties:['openDirectory','createDirectory']});if(chosen.canceled)return null;const stamp=new Date().toISOString().replace(/[:.]/g,'-'),outDir=path.join(chosen.filePaths[0],'范特西报告-'+stamp);const files=await doExport(outDir,selection);shell.showItemInFolder(files[0]);return {outDir,count:files.length};});
 }
-function menu(){const actionRefresh=()=>refresh().catch(()=>{});const items=[{label:'数据',submenu:[{label:'刷新比分和 Yahoo 数据',accelerator:'CmdOrCtrl+R',click:actionRefresh},{label:'显示主窗口',click:()=>{win.show();win.focus();}},{type:'separator'},{role:'quit',label:'退出 Thunder Fantasy'}]},{role:'editMenu',label:'编辑'},{role:'windowMenu',label:'窗口'}];if(process.platform==='darwin')items.unshift({label:app.name,submenu:[{role:'about',label:'关于 Thunder Fantasy'},{type:'separator'},{role:'hide',label:'隐藏'},{role:'unhide',label:'显示全部'},{type:'separator'},{role:'quit',label:'退出 Thunder Fantasy'}]});Menu.setApplicationMenu(Menu.buildFromTemplate(items));}
+function menu(){const actionRefresh=()=>refresh().catch(()=>{});const items=[{label:'更新',submenu:[{label:'检查应用更新',click:()=>updater?.check().catch(()=>{})}]},{label:'数据',submenu:[{label:'刷新比分和 Yahoo 数据',accelerator:'CmdOrCtrl+R',click:actionRefresh},{label:'显示主窗口',click:()=>{win.show();win.focus();}},{type:'separator'},{role:'quit',label:'退出 Thunder Fantasy'}]},{role:'editMenu',label:'编辑'},{role:'windowMenu',label:'窗口'}];if(process.platform==='darwin')items.unshift({label:app.name,submenu:[{role:'about',label:'关于 Thunder Fantasy'},{type:'separator'},{role:'hide',label:'隐藏'},{role:'unhide',label:'显示全部'},{type:'separator'},{role:'quit',label:'退出 Thunder Fantasy'}]});Menu.setApplicationMenu(Menu.buildFromTemplate(items));}
 app.whenReady().then(async()=>{
   state=new State(app.getPath('userData'));
+  managed=await managedExtension(path.join(__dirname,'../extension'),app.getPath('userData'));state.managedExtension=managed;
+  updater=new Updater({directory:path.join(app.getPath('userData'),'updates'),currentVersion:app.getVersion(),fetch:(...args)=>net.fetch(...args),enabled:app.isPackaged&&!smoke,onChange:value=>{if(win&&!win.isDestroyed())win.webContents.send('update-state',value);}});await updater.load();
   session.defaultSession.setPermissionRequestHandler((_contents,_permission,callback)=>callback(false));session.defaultSession.setPermissionCheckHandler(()=>false);
   protocol.handle('app',async request=>{
     const u=new URL(request.url);if(u.hostname!=='desktop')return new Response('Not found',{status:404});
@@ -70,9 +91,22 @@ app.whenReady().then(async()=>{
   win.on('closed',()=>{win=null;app.quit();});
   const errors=[];win.webContents.on('console-message',(_e,...rest)=>{if(smoke&&rest.some(x=>String(x).includes('Error')))errors.push(rest.map(String).join(' '));});
   await win.loadURL('app://desktop/index.html');if(!smoke)win.show();
+  if(!smoke&&!exportPath){
+    const target=process.platform==='darwin'?path.resolve(path.dirname(process.execPath),'../..'):path.dirname(process.execPath);
+    await finishInstall(updater.directory,app.getVersion(),target);
+    setTimeout(()=>pruneCache(updater.directory,app.getVersion()).catch(()=>{}),30000);
+    updateTimer=setTimeout(()=>updater.check(true).catch(()=>{}),30000);
+    updateInterval=setInterval(()=>updater.check(true).catch(()=>{}),6*60*60*1000);
+  }
   if(smoke){
     await new Promise(r=>setTimeout(r,300));const out=argument('--smoke-output');
     if(args.includes('--network')){await refreshScore();if(score.error)throw Error(score.error);process.stdout.write('ESPN_NETWORK_OK '+score.events.length+'\n');}
+    await win.webContents.executeJavaScript("document.querySelector('[data-page=settings]').click()");
+    updater.emit({phase:'downloading',version:'9.0.0',progress:45});await new Promise(r=>setTimeout(r,50));
+    if(!await win.webContents.executeJavaScript("document.getElementById('update-progress').value===45&&!document.getElementById('update-banner').hidden"))throw Error('自动更新下载进度未显示');
+    updater.emit({phase:'ready',progress:100});await new Promise(r=>setTimeout(r,50));
+    if(!await win.webContents.executeJavaScript("!document.getElementById('update-banner-install').hidden"))throw Error('自动更新安装入口未显示');
+    updater.emit({phase:'idle',version:null,progress:0});
     if(!await win.webContents.executeJavaScript("typeof require==='undefined'&&typeof process==='undefined'&&typeof desktop.getState==='function'"))throw Error('渲染进程隔离失败');
     if(out){await fs.mkdir(out,{recursive:true});await win.webContents.executeJavaScript("document.querySelector('[data-page=settings]').click()");await new Promise(r=>setTimeout(r,100));await fs.writeFile(path.join(out,'首次配置.png'),(await win.webContents.capturePage()).toPNG());}
     if(exportsCore.datasets(state.data.snapshots).length){
@@ -118,5 +152,5 @@ app.whenReady().then(async()=>{
 app.on('second-instance',()=>{if(win){if(win.isMinimized())win.restore();win.show();win.focus();}});
 app.on('activate',()=>{win?.show();});
 app.on('window-all-closed',()=>app.quit());
-app.on('before-quit',()=>{app.isQuitting=true;clearTimeout(scoreTimer);bridge?.close();});
+app.on('before-quit',()=>{app.isQuitting=true;clearTimeout(scoreTimer);clearTimeout(updateTimer);clearInterval(updateInterval);bridge?.close();});
 }

@@ -13,7 +13,7 @@ function createBridge(state,onChange=()=>{}){
     try{
       if(req.method==='POST'&&req.url==='/pair'){const b=await body();const result=state.pair(String(b.code||''),ext);onChange();return reply(200,{ok:true,...result});}
       if(!state.authorize(req.headers['x-client-id'],String(req.headers.authorization||'').replace(/^Bearer /,''),ext))return reply(401,{error:'配对已失效，请重新配对'});
-      if(req.method==='GET'&&req.url==='/config')return reply(200,{leagues:state.data.leagues});
+      if(req.method==='GET'&&req.url==='/config')return reply(200,{leagues:state.data.leagues,extensionVersion:state.managedExtension?.version,extensionInstance:state.managedExtension?.instance});
       if(req.method==='POST'&&req.url==='/import-league'){const league=state.importLeague(await body());onChange();return reply(200,{ok:true,league});}
       if(req.method==='POST'&&req.url==='/refresh-request'){await body();state.refresh('full');onChange();return reply(200,{ok:true});}
       if(req.method==='GET'&&req.url==='/refresh-request')return reply(200,state.command&&Date.now()-state.command.createdAt<600000?state.command:{});

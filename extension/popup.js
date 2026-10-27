@@ -12,7 +12,7 @@ async function previewTeam(){
   }catch(e){$('current-team').textContent=e.message;}
 }
 async function status(preview=true){
-  const r=await send({type:'popup-status'});config=r.config;
+  const r=await send({type:'popup-status'});config=r.config;$('reload-pages').hidden=!r.reloadPagesRequired;
   const connected=r.paired&&!r.appError;$('pair').hidden=connected;$('connected').hidden=!connected;
   $('status').textContent=r.appError||(r.status?`${r.status.ok?'最近一次同步完成（各盟状态见下方）':'同步提示'} · ${new Date(r.status.time).toLocaleString()}\n${r.status.error||''}`:'已配对，等待首次同步');
   $('leagues').style.whiteSpace='pre-wrap';
@@ -25,11 +25,12 @@ $('connect').onclick=()=>run(async()=>{await send({type:'pair',code:$('code').va
 $('import-team').onclick=()=>run(async()=>{
   if(!currentTeam)return;$('import-team').disabled=true;
   try{
-    const r=await send({type:'import-team',source:currentTeam.source});config=r.config;
+    const r=await send({type:'import-team',source:currentTeam.source});config=r.config;$('reload-pages').hidden=!r.reloadPagesRequired;
     await status();$('status').textContent=`已添加 ${r.league.name}（球队 ${r.league.team}），已请求首次完整同步。${r.needsReload?'请刷新 Yahoo 网页后保持打开。':'请保持 Yahoo 网页打开。'}`;
   }finally{await previewTeam();}
 });
 $('refresh').onclick=()=>run(async()=>{await send({type:'request-refresh'});$('status').textContent='已请求完整同步，请保持 Yahoo 标签页打开。';});
+$('reload-pages').onclick=()=>run(async()=>{await send({type:'reload-pages'});await status();});
 $('disconnect').onclick=()=>run(async()=>{await send({type:'unpair'});await status();});
 $('open').onclick=()=>run(async()=>{const l=config?.leagues?.[0];if(!l)throw Error('请先导入球队或在桌面应用配置联盟');if(!/^\d+$/.test(l.id)||!/^\d+$/.test(l.team))throw Error('ID 无效');await chrome.tabs.create({url:`https://basketball.fantasysports.yahoo.com/nba/${l.id}/${l.team}`});});
 run(status);

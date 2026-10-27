@@ -10,9 +10,9 @@ Mac / Windows 桌面比分与 Yahoo Fantasy 篮球分析工具。读取使用者
 
 在本仓库的 [Releases](https://github.com/boringcoin/NBA-Fantasy-mini-app/releases) 下载测试包。完整 ZIP 包含安装程序、浏览器同步扩展和说明，解压后按说明安装。
 
-- [Windows x64 测试包](https://github.com/boringcoin/NBA-Fantasy-mini-app/releases/download/v2.0.6/ThunderFantasy-2.0.6-Windows-x64.zip)
-- [Mac Apple 芯片测试包](https://github.com/boringcoin/NBA-Fantasy-mini-app/releases/download/v2.0.6/ThunderFantasy-2.0.6-Mac-Apple.zip)
-- [Mac Intel 测试包](https://github.com/boringcoin/NBA-Fantasy-mini-app/releases/download/v2.0.6/ThunderFantasy-2.0.6-Mac-Intel.zip)
+- [Windows x64 测试包](https://github.com/boringcoin/NBA-Fantasy-mini-app/releases/download/v2.1.0/ThunderFantasy-2.1.0-Windows-x64.zip)
+- [Mac Apple 芯片测试包](https://github.com/boringcoin/NBA-Fantasy-mini-app/releases/download/v2.1.0/ThunderFantasy-2.1.0-Mac-Apple.zip)
+- [Mac Intel 测试包](https://github.com/boringcoin/NBA-Fantasy-mini-app/releases/download/v2.1.0/ThunderFantasy-2.1.0-Mac-Intel.zip)
 
 各平台安装文件对应如下：
 
@@ -25,7 +25,7 @@ Mac / Windows 桌面比分与 Yahoo Fantasy 篮球分析工具。读取使用者
 同时下载浏览器扩展和说明。完整分享 ZIP 中已经附带扩展；GitHub Actions 构建产物中的扩展单列为 `ThunderFantasy-BrowserExtension-and-Docs`。
 
 1. 安装并打开桌面应用，在“设置与配对”生成六位配对码。
-2. 将扩展文件夹保存在固定位置，在 Edge / Chrome 的扩展管理页开启开发人员模式，加载含有 `manifest.json` 的目录。
+2. 在“设置与配对 → 应用更新 → 同步扩展自动维护”打开应用管理目录。在 Edge / Chrome 扩展管理页开启开发人员模式，加载这个含有 `manifest.json` 的 `YahooSync` 目录，以后扩展文件可随应用维护。安装包自带的扩展也能手动加载，但不会自动维护那个目录。
 3. 输入配对码，登录自己的 Yahoo，打开自己球队的 **My Team** 页面。
 4. 点击浏览器扩展，核对页面球队信息，再点“导入当前球队”。应用会添加该联盟并请求首次同步。
 5. 其他联盟重复第 3、4 步；之后可在桌面应用下拉菜单切换。
@@ -38,6 +38,8 @@ Mac / Windows 桌面比分与 Yahoo Fantasy 篮球分析工具。读取使用者
 
 ## 功能
 
+- Mac Apple / Intel 与 Windows x64 支持应用内更新：自动检查并下载，校验后点击“重启并安装”。从旧版首次升级仍需手动安装 2.1.0。
+- 应用管理的同步扩展目录随应用更新维护，浏览器仅需重新加载页面；首次迁移目录需重新配对一次。
 - 雷霆比分、三日赛程、实时战报、双方球员数据；窗口可调大小。
 - 多联盟切换，近 14 天及本赛季场均、GP、当前比赛日统计。
 - 每项按联盟人数分配排名分：12 人联盟第一 12 分、第二 11 分，并列平分所占名次。

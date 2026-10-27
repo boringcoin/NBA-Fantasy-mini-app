@@ -25,7 +25,20 @@ async function bridge(route,body,auth=true){
   let r;try{r=await fetch(BASE+route,{method:body===undefined?'GET':'POST',headers,body:body===undefined?undefined:JSON.stringify(body),signal:AbortSignal.timeout(15000)});}catch{throw Error('无法连接桌面应用，请先启动 Thunder Fantasy');}
   const result=await r.json();if(!r.ok)throw Error(result.error||'同步失败');return result;
 }
-async function configuration(force=false){if(!force&&configCache&&Date.now()-configCache.time<5000)return configCache.data;const data=await bridge('/config');configCache={time:Date.now(),data};return data;}
+let reloading=false;
+async function configuration(force=false){
+  if(!force&&configCache&&Date.now()-configCache.time<5000)return configCache.data;
+  const data=await bridge('/config');configCache={time:Date.now(),data};
+  if(!reloading&&data.extensionVersion&&typeof data.extensionInstance==='string'&&chrome.runtime.getManifest&&chrome.runtime.getManifest().version!==data.extensionVersion){
+    try{
+      const response=await fetch(chrome.runtime.getURL('managed.json')),marker=await response.json();
+      if(marker.instance===data.extensionInstance&&marker.version===data.extensionVersion){
+        reloading=true;await chrome.storage.local.set({reloadPagesRequired:true});chrome.runtime.reload();
+      }
+    }catch{}
+  }
+  return data;
+}
 async function currentTeam(){
   const [tab]=await chrome.tabs.query({active:true,currentWindow:true});
   const context=ThunderTeamContext.fromURL(tab?.url);
@@ -44,7 +57,8 @@ async function message(m,sender){
   if(m.type==='pair'&&popup){if(!/^\d{6}$/.test(String(m.code)))throw Error('请输入六位配对码');const paired=await bridge('/pair',{code:String(m.code)},false);await chrome.storage.local.set({pairing:{token:paired.token,clientID:paired.clientID}});configCache=null;await bridge('/refresh-request',{});return {ok:true};}
   if(m.type==='unpair'&&popup){await chrome.storage.local.remove('pairing');configCache=null;return {ok:true};}
   if(m.type==='get-config')return {ok:true,...await configuration(true)};
-  if(m.type==='popup-status'&&popup){const saved=await chrome.storage.local.get(['pairing','status','leagueStatus']);let appError=null,config=null;try{config=await configuration();}catch(e){appError=e.message;}return {ok:true,paired:!!saved.pairing,status:saved.status,leagueStatus:saved.leagueStatus||{},config,appError};}
+  if(m.type==='popup-status'&&popup){const saved=await chrome.storage.local.get(['pairing','status','leagueStatus','reloadPagesRequired']);let appError=null,config=null;try{config=await configuration();}catch(e){appError=e.message;}return {ok:true,paired:!!saved.pairing,status:saved.status,leagueStatus:saved.leagueStatus||{},reloadPagesRequired:!!saved.reloadPagesRequired,config,appError};}
+  if(m.type==='reload-pages'&&popup){const config=await configuration(true),tabs=await chrome.tabs.query({url:'https://basketball.fantasysports.yahoo.com/nba/*'});for(const tab of tabs){const id=new URL(tab.url).pathname.match(/^\/nba\/(\d+)(?:\/|$)/)?.[1];if(config.leagues.some(l=>l.id===id))await chrome.tabs.reload(tab.id);}await chrome.storage.local.remove('reloadPagesRequired');return {ok:true};}
   if(m.type==='request-refresh'&&popup){await bridge('/refresh-request',{});return {ok:true};}
   if(m.type==='current-team'&&popup)return {ok:true,context:await currentTeam()};
   if(m.type==='import-team'&&popup){

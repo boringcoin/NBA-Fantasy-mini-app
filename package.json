@@ -1,7 +1,7 @@
 {
   "name": "thunder-fantasy-desktop",
   "productName": "Thunder Fantasy",
-  "version": "2.0.6",
+  "version": "2.1.0",
   "description": "独立的雷霆比分与 Yahoo Fantasy 联盟分析桌面应用",
   "author": "Thunder Fantasy contributors",
   "license": "UNLICENSED",
@@ -15,7 +15,8 @@
     "smoke": "electron . --smoke-test"
   },
   "dependencies": {
-    "exceljs": "4.4.0"
+    "exceljs": "4.4.0",
+    "yauzl": "3.4.0"
   },
   "overrides": {
     "exceljs": {
@@ -37,7 +38,8 @@
       "app/**",
       "core/**",
       "assets/**",
-      "package.json"
+      "package.json",
+      "extension/**"
     ],
     "asar": true,
     "afterPack": "scripts/windows-branding.cjs",
