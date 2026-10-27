@@ -100,10 +100,20 @@
       // Keep the roster, but send statistics only for players on today's Yahoo slate.
       base.players=roster.players.map(p=>ids.has(p.id)?p:{...p,stats:{}});
       if(ids.size)base.recentUpdates=YahooParser.fromDocument(await get(rosterURL(league,'AL14'))).players.filter(p=>ids.has(p.id));
-      // Refresh this week's league totals every ten minutes too. Do not fetch
-      // historical weeks or the free-agent pool during this lightweight run.
-      base.leaguePower=matchup?await leaguePower(league,matchDoc,base,false):{teams:[],week:base.week,expectedTeamCount:0,error:matchupError,updatedAt:new Date().toISOString()};
-      await send(base);if(matchupError||base.leaguePower.error)throw Error(matchupError||base.leaguePower.error);return;
+      // League-wide power is independent from ten-minute player updates.
+      // Refresh once after 16:00 Beijing time, and retry on failure.
+      const daily=await chrome.runtime.sendMessage({type:'daily-power-due',...currentLease});
+      if(!daily?.ok)throw Error(daily?.error||'无法检查每日战力同步状态');
+      if(daily.due){
+        base.leaguePower=matchup?await leaguePower(league,matchDoc,base,false):{teams:[],week:base.week,expectedTeamCount:0,error:matchupError,updatedAt:new Date().toISOString()};
+      }
+      await send(base);
+      if(daily.due){
+        if(base.leaguePower.error)throw Error(base.leaguePower.error);
+        const result=await chrome.runtime.sendMessage({type:'daily-power-complete',...currentLease,day:daily.day});
+        if(!result?.ok)throw Error(result?.error||'无法保存每日战力同步状态');
+      }
+      if(matchupError)throw Error(matchupError);return;
     }
     base.syncScope='full';
     await send(base);

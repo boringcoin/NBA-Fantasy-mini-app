@@ -57,7 +57,7 @@ async function message(m,sender){
   }
   if(!content)throw Error('该消息仅允许同步页面发送');
   const config=await configuration(),id=new URL(sender.url).pathname.match(/^\/nba\/(\d+)/)?.[1];if(!config.leagues.some(l=>l.id===id))throw Error('当前页面不属于配置的联盟');
-  if(['acquire-sync','release-sync','sync-heartbeat','snapshot','get-refresh-request'].includes(m.type))return serial(async()=>{
+  if(['acquire-sync','release-sync','sync-heartbeat','snapshot','get-refresh-request','daily-power-due','daily-power-complete'].includes(m.type))return serial(async()=>{
     if(m.type==='get-refresh-request')return {ok:true,...await observeCommand(config)};
     const leagueID=m.type==='snapshot'?m.data?.leagueID:m.leagueID;
     const league=config.leagues.find(l=>l.id===leagueID);
@@ -74,6 +74,15 @@ async function message(m,sender){
       return {ok:true,leaseID:lease.leaseID};
     }
     if(!coordinator.owns(leagueID,sender.tab.id,m.leaseID))throw Error('这个联盟的同步任务已失效，请重试');
+    if(m.type==='daily-power-due'){
+      const day=dailyDay(),saved=await chrome.storage.local.get('powerByLeague');
+      return {ok:true,due:!!day&&saved.powerByLeague?.[leagueID]!==day,day};
+    }
+    if(m.type==='daily-power-complete'){
+      const day=dailyDay();if(!day||m.day!==day)throw Error('每日战力同步日期已变化，请重试');
+      const saved=await chrome.storage.local.get('powerByLeague'),days=saved.powerByLeague||{};days[leagueID]=day;
+      await chrome.storage.local.set({powerByLeague:days});return {ok:true};
+    }
     if(m.type==='snapshot'){
       coordinator.heartbeat(leagueID,sender.tab.id,m.leaseID);await saveCoordinator();
       await bridge('/snapshot',m.data);return {ok:true};
