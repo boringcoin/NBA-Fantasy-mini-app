@@ -170,7 +170,7 @@
     }
     base.receivedAt=new Date().toISOString();
     await send(base);
-    const warnings=[matchupError,base.research?.error,base.research?.seasonError,base.leaguePower?.error,base.dailyResearch?.error].filter(Boolean);
+    const warnings=[matchupError,base.research?.error,base.research?.seasonError,base.leaguePower?.error,base.leaguePower?.historyError,base.dailyResearch?.error].filter(Boolean);
     if(warnings.length)throw Error([...new Set(warnings)].join('；'));
   }
   async function sync(requestID=null,todayOnly=false,daily=false,targetLeague=null) {

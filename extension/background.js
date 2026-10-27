@@ -8,9 +8,11 @@ const ready=Promise.all([chrome.storage.session.get('coordinator'),chrome.storag
 });
 function serial(fn){const result=coordination.then(fn,fn);coordination=result.catch(()=>{});return result;}
 async function saveCoordinator(){await chrome.storage.session.set({coordinator:coordinator.saved()});}
-async function leagueStatus(id,state,error=''){
+async function leagueStatus(id,state,error='',scope='full'){
   const saved=await chrome.storage.local.get('leagueStatus'),statuses=saved.leagueStatus||{};
-  statuses[id]={state,error:String(error).slice(0,1200),time:Date.now()};
+  const previous=statuses[id]||{};
+  const lastFull=scope==='full'&&state!=='started'?{state,error:String(error).slice(0,1200),time:Date.now()}:previous.lastFull;
+  statuses[id]={state,error:String(error).slice(0,1200),time:Date.now(),scope,lastFull};
   await chrome.storage.local.set({leagueStatus:statuses});
 }
 function dailyDay(){
@@ -100,8 +102,9 @@ async function message(m,sender){
       coordinator.heartbeat(leagueID,sender.tab.id,m.leaseID);await saveCoordinator();return {ok:true};
     }
     const error=String(m.error||'').slice(0,1200);
+    const scope=coordinator.leases[leagueID]?.todayOnly?'today':'full';
     coordinator.finish(leagueID,sender.tab.id,m.leaseID,error);await saveCoordinator();
-    await leagueStatus(leagueID,error?'error':'completed',error);
+    await leagueStatus(leagueID,error?'error':'completed',error,scope);
     const completion=coordinator.completion();
     if(completion){
       await bridge('/refresh-status',{...completion,state:'completed'});

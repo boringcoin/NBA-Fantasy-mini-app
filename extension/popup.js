@@ -14,9 +14,9 @@ async function previewTeam(){
 async function status(preview=true){
   const r=await send({type:'popup-status'});config=r.config;
   const connected=r.paired&&!r.appError;$('pair').hidden=connected;$('connected').hidden=!connected;
-  $('status').textContent=r.appError||(r.status?`${r.status.ok?'最近一次同步完成（各盟状态见下方）':'同步提示'} · ${new Date(r.status.time).toLocaleString()}\n${r.status.error||''}`:'已配对，等待首次同步');
+  $('status').textContent=`扩展版本 ${chrome.runtime.getManifest().version}\n`+(r.appError||(r.status?`${r.status.ok?'最近一次同步完成（各盟状态见下方）':'同步提示'} · ${new Date(r.status.time).toLocaleString()}\n${r.status.error||''}`:'已配对，等待首次同步'));
   $('leagues').style.whiteSpace='pre-wrap';
-  $('leagues').textContent=(config?.leagues||[]).map(l=>{const s=r.leagueStatus?.[l.id];return `${l.name}（${l.id}） · ${!s?'尚未同步':s.state==='started'?'正在同步…':s.state==='completed'?'同步成功 · '+new Date(s.time).toLocaleTimeString():'同步未完成：'+s.error}`;}).join('\n\n')||'尚未添加球队。打开自己的 My Team，然后点击下方导入。';
+  $('leagues').textContent=(config?.leagues||[]).map(l=>{const s=r.leagueStatus?.[l.id],full=s?.lastFull;const latest=!s?'尚未同步':s.state==='started'?'正在同步…':s.state==='completed'?(s.scope==='today'?'球员同步完成':'完整同步完成')+' · '+new Date(s.time).toLocaleTimeString():'同步未完成：'+s.error;return `${l.name}（${l.id}） · ${latest}${full?.state==='error'&&s?.scope==='today'?'\n上次完整同步未完成：'+full.error:''}`;}).join('\n\n')||'尚未添加球队。打开自己的 My Team，然后点击下方导入。';
   $('refresh').disabled=!config?.leagues?.length;$('open').disabled=!config?.leagues?.length;
   if(connected&&preview)await previewTeam();
 }
