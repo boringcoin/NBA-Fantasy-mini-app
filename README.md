@@ -10,8 +10,8 @@ Mac / Windows 桌面比分与 Yahoo Fantasy 篮球分析工具。读取使用者
 
 在本仓库的 [Releases](https://github.com/boringcoin/NBA-Fantasy-mini-app/releases) 下载测试包。完整 ZIP 包含安装程序、浏览器同步扩展和说明，解压后按说明安装。
 
-- [Windows x64 测试包](https://github.com/boringcoin/NBA-Fantasy-mini-app/releases/download/v2.0.10/ThunderFantasy-2.0.10-Windows-x64.zip)
-- [Mac Apple 芯片测试包](https://github.com/boringcoin/NBA-Fantasy-mini-app/releases/download/v2.0.10/ThunderFantasy-2.0.10-Mac-Apple.zip)
+- [Windows x64 测试包](https://github.com/boringcoin/NBA-Fantasy-mini-app/releases/download/v2.0.11/ThunderFantasy-2.0.11-Windows-x64.zip)
+- [Mac Apple 芯片测试包](https://github.com/boringcoin/NBA-Fantasy-mini-app/releases/download/v2.0.11/ThunderFantasy-2.0.11-Mac-Apple.zip)
 
 各平台安装文件对应如下：
 
@@ -36,7 +36,7 @@ Mac / Windows 桌面比分与 Yahoo Fantasy 篮球分析工具。读取使用者
 
 ## 功能
 
-- 应用内自动更新仍在开发验证中；当前 2.0.10 版本需手动安装。
+- 应用内自动更新仍在开发验证中；当前 2.0.11 版本需手动安装。
 
 - 雷霆比分、三日赛程、实时战报、双方球员数据；窗口可调大小。
 - 多联盟切换，近 14 天及本赛季场均、GP、当前比赛日统计。
