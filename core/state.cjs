@@ -1,7 +1,7 @@
 'use strict';
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
 const {KEYS}=require('./analysis.cjs');
-const {mergePowerHistory,season}=require('./weeks.cjs');
+const {mergePowerHistory,season,powers}=require('./weeks.cjs');
 const numeric=v=>typeof v==='string'&&/^\d{1,10}$/.test(v);
 function validateLeagues(input){
   if(!Array.isArray(input)||input.length>12)throw Error('最多配置 12 个联盟');
@@ -18,7 +18,7 @@ function validateSnapshot(data,leagues){
   validatePeople(data.players,80);validatePeople(data.teams,24);
   for(const research of [data.research,data.dailyResearch])if(research)for(const key of ['recent','prior','season','available'])if(research[key])validatePeople(research[key],180);
   if(data.recentUpdates)validatePeople(data.recentUpdates,80);
-  if(data.leaguePower){validatePeople(data.leaguePower.teams,24);if((data.leaguePower.priorWeeks||[]).length>4)throw Error('历史周次过多');for(const week of data.leaguePower.priorWeeks||[])validatePeople(week.teams,24);}
+  if(data.leaguePower){validatePeople(data.leaguePower.teams,24);if(data.leaguePower.weeklyPlayers)validatePeople(data.leaguePower.weeklyPlayers,80);if((data.leaguePower.priorWeeks||[]).length>4)throw Error('历史周次过多');for(const week of data.leaguePower.priorWeeks||[]){validatePeople(week.teams,24);if(week.weeklyPlayers)validatePeople(week.weeklyPlayers,80);}}
   if(data.powerHistory){if(!Array.isArray(data.powerHistory)||data.powerHistory.length>40)throw Error('历史周次过多');for(const week of data.powerHistory)validatePeople(week.teams,24);}
   const source=new URL(data.source);if(source.origin!=='https://basketball.fantasysports.yahoo.com'||!source.pathname.startsWith('/nba/'+league.id+'/'))throw Error('无效数据来源');
   return {...data,league:league.name,receivedAt:new Date().toISOString()};
@@ -33,6 +33,8 @@ function mergeSnapshot(previous,next){
     merged.research={...(previous.research||{}),recent:[...recent.values()]};
   }
   merged.powerHistory=mergePowerHistory(previous,next);
+  // Keep the last complete same-week table when a later network request fails.
+  if(next.leaguePower?.error){const cached=powers(previous).find(p=>p.week===next.week);if(cached)merged.leaguePower={...cached,priorWeeks:previous.leaguePower?.priorWeeks||[],syncWarning:next.leaguePower.error};}
   return merged;
 }
 class State {

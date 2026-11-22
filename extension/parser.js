@@ -17,7 +17,7 @@
         if(candidate.includes('FG%') && candidate.includes('PTS') && candidate.includes('TO')) { labels=candidate; const scoring=columns.filter(k=>{const i=candidate.indexOf(k);return i>=0&&!String(cells[i].text).includes('*');});if(scoring.length>=8)result.columns=scoring;continue; }
         if(!labels || cells.length<labels.length) continue;
         const stats={};
-        labels.forEach((key,i)=>{if([...columns,'GP','FGM/A','FTM/A','MPG','%ROS'].includes(key))stats[key]=clean(cells[i]?.text);});
+        labels.forEach((key,i)=>{if([...columns,'GP','FGM/A','FTM/A','MIN','MPG','%ROS'].includes(key))stats[key]=clean(cells[i]?.text);});
         if(Object.keys(stats).length<8)continue;
         const playerCell=cells.find(c=>c.player);
         if(playerCell) {
@@ -80,6 +80,17 @@
     }
     return {teamIDs:[...teamIDs],matchups:[...matchups.values()]};
   }
-  root.YahooParser={setLeague,columns,parseTables,fromDocument,leagueLinks,matchupGP};
+  function historicalOpponent(doc,leagueID,week,teamID,origin='https://basketball.fantasysports.yahoo.com') {
+    for(const a of doc.querySelectorAll('a[href]')) {
+      let u;try{u=new URL(a.getAttribute('href'),origin);}catch{continue;}
+      if(u.origin!==origin)continue;
+      const m=u.pathname.match(new RegExp(`^/nba/${leagueID}/(\\d+)(?:/team)?/?$`));
+      if(!m||m[1]===teamID)continue;
+      let parent=a.parentElement;
+      for(let n=0;parent&&n<4;n++,parent=parent.parentElement){const text=(parent.textContent||'').replace(/\s+/g,' ').trim();if(text.length<240&&new RegExp(`\\bWeek\\s+${week}\\s+vs\\b`,'i').test(text))return m[1];}
+    }
+    return null;
+  }
+  root.YahooParser={setLeague,columns,parseTables,fromDocument,leagueLinks,matchupGP,historicalOpponent};
   if(typeof module!=='undefined')module.exports=root.YahooParser;
 })(globalThis);

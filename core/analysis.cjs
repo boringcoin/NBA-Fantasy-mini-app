@@ -56,8 +56,8 @@ function analyze(snapshot){
 function health(player){
   const text=String(player?.info||'')+' '+String(player?.status||'');
   const tail=text.startsWith(player?.name||'\0')?text.slice(player.name.length):text;
-  if(/\b(?:INJ|IL\+?|OUT|OFS|O|SUSP|NA)\b|受伤|裁掉|无球队|停赛|waived|released|unsigned/i.test(tail)||/\b(?:FA|N\/A)\s*-\s*(?:PG|SG|SF|PF|C)\b/i.test(tail))return '暂不可出场';
-  if(/\b(?:GTD|DTD|Q|D)\b/i.test(tail))return '出场待定';
+  if(/^(?:INJ|IL\+?|OUT|OFS|O|SUSP|NA)(?=No new player Notes\b)/i.test(tail)||/\b(?:INJ|IL\+?|OUT|OFS|O|SUSP|NA)\b|受伤|裁掉|无球队|停赛|waived|released|unsigned/i.test(tail)||/\b(?:FA|N\/A)\s*-\s*(?:PG|SG|SF|PF|C)\b/i.test(tail))return '暂不可出场';
+  if(/^(?:GTD|DTD|Q|D)(?=No new player Notes\b)/i.test(tail)||/\b(?:GTD|DTD|Q|D)\b/i.test(tail))return '出场待定';
   if(!/\b(?:ATL|BOS|BKN|BRK|CHA|CHI|CLE|DAL|DEN|DET|GSW|GS|HOU|IND|LAC|LAL|MEM|MIA|MIL|MIN|NOP|NO|NYK|NY|OKC|ORL|PHI|PHX|POR|SAC|SAS|SA|TOR|UTA|UTAH|WAS|WSH)\s*-\s*(?:PG|SG|SF|PF|C)\b/.test(tail))return '所属球队待确认';
   return '未发现伤停标记';
 }
@@ -93,4 +93,4 @@ function playerValues(snapshot,mode='balanced'){
   const recommendations=stale?[]:owned.filter(r=>r.score!=null).sort((a,b)=>a.score-b.score).slice(0,5).flatMap(out=>{const pos=positions(out.player);return pool.filter(row=>[...positions(row.player)].some(p=>pos.has(p))).sort((a,b)=>b.score-a.score).slice(0,20).filter(row=>row.score>out.score+.1).slice(0,1).map(row=>({out:out.player,into:row.player,gain:row.score-out.score,improves:columns.filter(k=>row.zs[k]>out.zs[k]).sort((a,b)=>(row.zs[b]-out.zs[b])-(row.zs[a]-out.zs[a])).slice(0,3),costs:columns.filter(k=>row.zs[k]<out.zs[k]).slice(0,3),sample:row.sample,outSample:out.sample}));});
   return {owned:owned.sort((a,b)=>(b.score??-Infinity)-(a.score??-Infinity)),recommendations,message:stale?'当前状态超过 15 分钟未更新，请刷新后再查看换人参考。':research?.error||(!research?'尚未同步当前自由球员池，仅显示自己的球员。':'参考当前池子前 100 位，按相同位置前 20 位候选分析。')};
 }
-module.exports={KEYS,LABEL,number,value,compare,analyze,playerValues,health};
+module.exports={KEYS,LABEL,number,value,compare,rankTeams,analyze,playerValues,health};

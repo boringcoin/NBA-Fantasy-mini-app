@@ -1,5 +1,6 @@
 'use strict';
 const http=require('node:http');
+const {availableWeeks,powers,weekNumber}=require('./weeks.cjs');
 function createBridge(state,onChange=()=>{}){
   const server=http.createServer(async(req,res)=>{
     const origin=req.headers.origin||'',ext=req.headers['x-extension-id']||'',validExt=/^[a-p]{32}$/.test(ext);
@@ -13,7 +14,7 @@ function createBridge(state,onChange=()=>{}){
     try{
       if(req.method==='POST'&&req.url==='/pair'){const b=await body();const result=state.pair(String(b.code||''),ext);onChange();return reply(200,{ok:true,...result});}
       if(!state.authorize(req.headers['x-client-id'],String(req.headers.authorization||'').replace(/^Bearer /,''),ext))return reply(401,{error:'配对已失效，请重新配对'});
-      if(req.method==='GET'&&req.url==='/config')return reply(200,{leagues:state.data.leagues,extensionVersion:state.managedExtension?.version,extensionInstance:state.managedExtension?.instance});
+      if(req.method==='GET'&&req.url==='/config')return reply(200,{leagues:state.data.leagues.map(l=>{const snapshot=state.data.snapshots[l.id],list=powers(snapshot),previous=weekNumber(snapshot?.week)-1;return {...l,cachedWeeks:availableWeeks(snapshot).filter(w=>w.available).map(w=>w.week),mvpWeeks:list.filter(w=>w.weeklyPlayers?.length).map(w=>w.week),completedPower:list.find(w=>weekNumber(w.week)===previous)};}),extensionVersion:state.managedExtension?.version,extensionInstance:state.managedExtension?.instance});
       if(req.method==='POST'&&req.url==='/import-league'){const league=state.importLeague(await body());onChange();return reply(200,{ok:true,league});}
       if(req.method==='POST'&&req.url==='/refresh-request'){await body();state.refresh('full');onChange();return reply(200,{ok:true});}
       if(req.method==='GET'&&req.url==='/refresh-request')return reply(200,state.command&&Date.now()-state.command.createdAt<600000?state.command:{});

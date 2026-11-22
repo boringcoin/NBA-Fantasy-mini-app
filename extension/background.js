@@ -109,6 +109,6 @@ async function message(m,sender){
   throw Error('未知操作');
 }
 chrome.runtime.onMessage.addListener((m,sender,respond)=>{message(m,sender).then(respond,e=>respond({ok:false,error:e.message}));return true;});
-chrome.runtime.onInstalled.addListener(()=>chrome.alarms.create('today-owned',{periodInMinutes:10}));
+chrome.runtime.onInstalled.addListener(async details=>{if(details?.reason==='update')await chrome.storage.local.set({yahooBackoffUntil:Date.now()+30*60*1000});chrome.alarms.create('today-owned',{periodInMinutes:10});});
 chrome.runtime.onStartup.addListener(()=>chrome.alarms.create('today-owned',{periodInMinutes:10}));
 chrome.alarms.onAlarm.addListener(async alarm=>{if(alarm.name!=='today-owned')return;const tabs=await chrome.tabs.query({url:'https://basketball.fantasysports.yahoo.com/nba/*'});for(const tab of tabs)chrome.tabs.sendMessage(tab.id,{type:'auto-sync'}).catch(()=>{});});

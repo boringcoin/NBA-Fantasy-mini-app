@@ -1,0 +1,20 @@
+'use strict';
+const {test}=require('node:test'),assert=require('node:assert/strict');
+const {parseGames,rank,transform}=require('../core/daily-rank.cjs');
+test('parses real box score fields and excludes unplayed players',()=>{const event={status:{type:{state:'in',shortDetail:'4th'}}},labels=['MIN','PTS','FG','3PT','FT','REB','AST','TO','STL','BLK','OREB'];const detail={boxscore:{players:[{team:{abbreviation:'OKC'},statistics:[{labels,athletes:[{athlete:{id:'1',displayName:'Player One'},stats:['0:45','4','2-2','0-0','0-0','1','1','0','0','0','0']},{didNotPlay:true,athlete:{id:'2',displayName:'Absent'},stats:[]}]}]}]}};const p=parseGames([{event,detail}]);assert.equal(p.length,1);assert.equal(p[0].fgm,2);assert.equal(p[0].minutes,'0:45');});
+test('DURANT reference transformation handles zeros negatives and punt changes ranking',()=>{assert.ok(transform([-10,0,1,3,20]).every(Number.isFinite));const rows=[{name:'A',PTS:30,TO:9,fgm:5,fga:10,ftm:2,fta:2},{name:'B',PTS:10,TO:0,fgm:5,fga:10,ftm:2,fta:2},{name:'C',PTS:12,TO:1,fgm:5,fga:10,ftm:2,fta:2}];assert.equal(rank(rows,['PTS','TO'],['TO'])[0].name,'A');assert.equal(rank(rows,['PTS','TO'],['PTS'])[0].name,'B');assert.ok(rank(rows,['PTS','TO'],['PTS','TO']).every(x=>x.score===null));});
+test('eleven weighted contributions add up to score and react to punt',()=>{
+  const cats=['FG%','FT%','3PTM','PTS','OREB','REB','AST','ST','BLK','TO','A/T'];
+  const players=[0,1,2,3].map(i=>({name:'P'+i,PTS:10+i*4,'3PTM':i,OREB:i,REB:3+i,AST:2+i,ST:i%2,BLK:i%3,TO:i,fgm:3+i,fga:10,ftm:i,fta:4}));
+  const first=rank(players,cats).find(p=>p.name==='P3');
+  assert.equal(Object.keys(first.contributions).length,11);
+  assert.ok(Math.abs(Object.values(first.contributions).reduce((a,b)=>a+b,0)-first.score)<1e-12);
+  assert.ok(Math.abs(first.contributions.TO-first.zs.TO*.5/10.5)<1e-12);
+  const punted=rank(players,cats,['TO']).find(p=>p.name==='P3');
+  assert.equal(punted.contributions.TO,null);
+  assert.ok(Math.abs(punted.contributions.PTS-punted.zs.PTS/10)<1e-12);
+  assert.ok(Math.abs(Object.values(punted.contributions).reduce((a,b)=>a+(b??0),0)-punted.score)<1e-12);
+  const missing=rank([{...players[0],PTS:null},...players.slice(1)],cats).find(p=>p.name==='P0');
+  assert.equal(missing.score,null);
+  assert.ok(Object.values(missing.contributions).every(v=>v===null));
+});

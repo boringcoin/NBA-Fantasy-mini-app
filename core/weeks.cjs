@@ -11,14 +11,14 @@ function powers(snapshot){
   for(const power of [...(snapshot?.powerHistory||[]),...(snapshot?.leaguePower?.priorWeeks||[]),snapshot?.leaguePower]){
     const columns=power?.columns||snapshot?.columns;
     if(!complete(power,columns,snapshot?.teamID))continue;
-    map.set(power.week,{week:power.week,columns,teams:power.teams,expectedTeamCount:power.expectedTeamCount,matchupPairs:power.matchupPairs||[],updatedAt:power.updatedAt||snapshot.leaguePower?.updatedAt||snapshot.receivedAt,seasonYear:power.seasonYear||season(snapshot)});
+    const old=map.get(power.week);map.set(power.week,{week:power.week,columns,teams:power.teams,expectedTeamCount:power.expectedTeamCount,matchupPairs:power.matchupPairs||[],updatedAt:power.updatedAt||snapshot.leaguePower?.updatedAt||snapshot.receivedAt,seasonYear:power.seasonYear||season(snapshot),weeklyPlayers:power.weeklyPlayers?.length?power.weeklyPlayers:old?.weeklyPlayers||[],weeklyPlayersError:power.weeklyPlayers?.length?null:power.weeklyPlayersError||old?.weeklyPlayersError||null});
   }
   return [...map.values()].sort((a,b)=>weekNumber(b.week)-weekNumber(a.week)).slice(0,40);
 }
 function mergePowerHistory(previous,next){
   const compatible=previous?.leagueID===next.leagueID&&previous?.teamID===next.teamID&&!(season(previous)&&season(next)&&season(previous)!==season(next));
   const map=new Map((compatible?powers(previous):[]).map(p=>[p.week,p]));
-  for(const power of powers(next))map.set(power.week,power);
+  for(const power of powers(next)){const old=map.get(power.week);map.set(power.week,{...power,weeklyPlayers:power.weeklyPlayers?.length?power.weeklyPlayers:old?.weeklyPlayers||[],weeklyPlayersError:power.weeklyPlayers?.length?null:power.weeklyPlayersError||old?.weeklyPlayersError||null});}
   return [...map.values()].sort((a,b)=>weekNumber(b.week)-weekNumber(a.week)).slice(0,40);
 }
 function availableWeeks(snapshot){
@@ -37,4 +37,4 @@ function powerSnapshot(snapshot,week){
   const pair=power.matchupPairs.find(p=>p.includes(snapshot.teamID))||[snapshot.teamID];
   return {...snapshot,week,columns:power.columns,leaguePower:{...power,priorWeeks},powerHistory:undefined,teams:historical?power.teams.filter(t=>pair.includes(t.id)):snapshot.teams,players:historical?[]:snapshot.players,research:historical?undefined:snapshot.research,dailyResearch:historical?undefined:snapshot.dailyResearch,source:`https://basketball.fantasysports.yahoo.com/nba/${snapshot.leagueID}/matchup?week=${weekNumber(week)}&date=totals`};
 }
-module.exports={weekNumber,availableWeeks,powerSnapshot,mergePowerHistory,season};
+module.exports={weekNumber,availableWeeks,powerSnapshot,mergePowerHistory,season,powers};

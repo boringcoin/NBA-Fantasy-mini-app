@@ -3,12 +3,20 @@
   let leagues=[];
   let busy=false,currentLease=null;
   const parse=html=>new DOMParser().parseFromString(html,'text/html');
-  async function get(url) {
-    const r=await fetch(url,{credentials:'include',cache:'no-store',signal:AbortSignal.timeout(20000)});
+  let queue=Promise.resolve(),lastRequest=0;
+  async function fetchPage(url) {
+    const storage=chrome.storage?.local,backoff=(await storage?.get('yahooBackoffUntil'))?.yahooBackoffUntil||0;
+    if(Date.now()<backoff)throw Error('Yahoo 暂时拒绝访问，同步已暂停，请稍后再试');
+    const wait=storage?Math.max(0,1000-(Date.now()-lastRequest)):0;if(wait)await new Promise(resolve=>setTimeout(resolve,wait));lastRequest=Date.now();
+    let r;
+    try{r=await fetch(url,{credentials:'include',cache:'no-store',signal:AbortSignal.timeout(45000)});}
+    catch(error){const timeout=error?.name==='TimeoutError'||error?.name==='AbortError';throw Error(timeout?'Yahoo 页面连接超时，请检查网络或代理后重试；已有数据会保留。':'无法连接 Yahoo，请检查网络或代理后重试；已有数据会保留。');}
+    if(r.status===403||r.status===429){await storage?.set({yahooBackoffUntil:Date.now()+30*60*1000});throw Error('Yahoo 拒绝请求，同步已暂停 30 分钟，请稍后再试');}
     if(!r.ok)throw Error(`雅虎页面请求失败（HTTP ${r.status}）：${new URL(url).pathname}`);
     if(new URL(r.url).hostname!==location.hostname)throw Error('雅虎登录失效，请重新登录 Yahoo');
-    return parse(await r.text());
+    const doc=parse(await r.text());if(/^request denied[.!\s]*$/i.test((doc.body?.textContent||'').trim())){await storage?.set({yahooBackoffUntil:Date.now()+30*60*1000});throw Error('Yahoo 拒绝请求，同步已暂停 30 分钟，请稍后再试');}return doc;
   }
+  async function get(url){const next=queue.then(()=>fetchPage(url),()=>fetchPage(url));queue=next.catch(()=>{});return next;}
   const rosterURL=(league,period)=>{
     const url=new URL(`/nba/${league.id}/${league.team}`,location.origin);
     if(period){url.searchParams.set('stat1','AS');url.searchParams.set('stat2',period);}
@@ -29,6 +37,19 @@
     if(!result?.ok)throw Error(result?.error||'桌面应用尚未连接');
   }
   const hasGameToday=player=> /(?:\bvs\s+|@\s*)[A-Z]{2,3}\b/i.test(player.info||'') || (player.stats?.PTS!=null && String(player.stats.PTS).trim()!=='' && Number.isFinite(Number(player.stats.PTS)));
+  async function weeklyPlayers(league,doc,week,team){
+    try{
+      const dates=new Set();for(const a of doc.querySelectorAll('a[href]')){let u;try{u=new URL(a.getAttribute('href'),location.origin)}catch{continue}const d=u.searchParams.get('date');if(u.origin===location.origin&&u.pathname===`/nba/${league.id}/matchup`&&/^\d{4}-\d{2}-\d{2}$/.test(d||'')&&u.searchParams.get('week')===String(week))dates.add(d);}
+      if(dates.size!==7)throw Error('未识别完整的 7 天日期');
+      const today=new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+      const active=[...dates].sort().filter(d=>d<=today),pages=await Promise.all(active.map(async date=>{const u=new URL(`/nba/${league.id}/${league.team}/team`,location.origin);u.searchParams.set('date',date);return YahooParser.fromDocument(await get(u)).players;}));
+      const count=['3PTM','PTS','OREB','REB','AST','ST','BLK','TO'],rows=new Map();
+      for(const day of pages)for(const p of day){if(!p.position||/^(BN|IL|IL\+|IR|NA|--)/i.test(p.position)||!String(p.stats.MIN||'').split(':').some(v=>Number(v)>0))continue;const fg=/^(\d+)\/(\d+)$/.exec(p.stats['FGM/A']||''),ft=/^(\d+)\/(\d+)$/.exec(p.stats['FTM/A']||'');if(!fg||!ft||count.some(k=>!/^\d+$/.test(String(p.stats[k]??''))))continue;let v=rows.get(p.id);if(!v){v={id:p.id,name:p.name,stats:Object.fromEntries([...count,'GP','FGM','FGA','FTM','FTA'].map(k=>[k,0]))};rows.set(p.id,v);}v.stats.GP++;for(const k of count)v.stats[k]+=Number(p.stats[k]);v.stats.FGM+=Number(fg[1]);v.stats.FGA+=Number(fg[2]);v.stats.FTM+=Number(ft[1]);v.stats.FTA+=Number(ft[2]);}
+      const players=[...rows.values()],sum=k=>players.reduce((n,p)=>n+p.stats[k],0),totals=team?.stats||{};for(const k of count)if(!/^\d+$/.test(String(totals[k]??''))||sum(k)!==Number(totals[k]))throw Error(`球员${k}累计与球队总数不一致`);for(const [key,m,a] of [['FGM/A','FGM','FGA'],['FTM/A','FTM','FTA']]){const v=/^(\d+)\/(\d+)$/.exec(totals[key]||'');if(!v||sum(m)!==Number(v[1])||sum(a)!==Number(v[2]))throw Error(`${key}累计与球队总数不一致`);}
+      for(const p of players){p.stats['FGM/A']=p.stats.FGM+'/'+p.stats.FGA;p.stats['FTM/A']=p.stats.FTM+'/'+p.stats.FTA;}
+      return {players,error:null};
+    }catch(e){return {players:[],error:String(e.message||e).slice(0,300)};}
+  }
   async function leaguePower(league,matchDoc,base,withHistory=true) {
     const week=(base.week.match(/\d+/)||[])[0];
     const empty={teams:[],week:base.week,updatedAt:new Date().toISOString(),expectedTeamCount:0,error:null};
@@ -40,7 +61,12 @@
       empty.expectedTeamCount=ids.size;
       if(ids.size<4||ids.size>24)throw Error('未识别完整联盟球队名单');
       const rows=new Map(base.teams.map(t=>[t.id,t]));
-      const matches=[...new Map(links.flatMap(l=>l.matchups).map(m=>[m.ids.slice().sort().join(':'),m])).values()];
+      const matches=base.historical?[]:[...new Map(links.flatMap(l=>l.matchups).map(m=>[m.ids.slice().sort().join(':'),m])).values()];
+      if(base.historical&&new Set(matches.flatMap(m=>m.ids)).size<ids.size){
+        const teamIDs=[...ids],pages=await Promise.allSettled(teamIDs.map(async id=>{const url=new URL(`/nba/${league.id}/${id}`,location.origin);url.searchParams.set('week',week);return YahooParser.historicalOpponent(await get(url),league.id,week,id,location.origin);}));
+        const byTeam=new Map(teamIDs.map((id,i)=>[id,pages[i].status==='fulfilled'?pages[i].value:null]));
+        for(const [id,opponent] of byTeam){if(!opponent||!ids.has(opponent)||byTeam.get(opponent)!==id)continue;const key=[id,opponent].sort().join(':');if(matches.some(m=>m.ids.slice().sort().join(':')===key))continue;const url=new URL(`/nba/${league.id}/matchup`,location.origin);for(const [k,v] of Object.entries({week,mid1:id,mid2:opponent,date:'totals'}))url.searchParams.set(k,v);matches.push({url:url.href,ids:[id,opponent]});}
+      }
       for(const match of matches.slice(0,12)) {
         if(match.ids.every(id=>rows.has(id)))continue;
         if(!match.ids.every(id=>ids.has(id)))continue;
@@ -63,11 +89,12 @@
   async function addHistory(league,result){
     const week=Number((result.week.match(/\d+/)||[])[0]);result.priorWeeks=[];const errors=[];
     for(let prior=week-1;prior>=Math.max(1,week-4);prior--){
+      if((league.cachedWeeks||[]).includes('Week '+prior))continue;
       try{
         const url=new URL(`/nba/${league.id}/matchup`,location.origin);url.searchParams.set('week',String(prior));url.searchParams.set('date','totals');
         const doc=await get(url);if((doc.body.textContent.match(/Week\s+(\d+)/)||[])[1]!==String(prior))throw Error('历史周次不一致');
         const parsed=YahooParser.fromDocument(doc);if(parsed.teams.length!==2)throw Error('历史对局不完整');
-        const power=await leaguePower(league,doc,{week:'Week '+prior,teams:parsed.teams},false);if(power.error)throw Error(power.error);
+        const power=await leaguePower(league,doc,{week:'Week '+prior,teams:parsed.teams,historical:true},false);if(power.error)throw Error(power.error);
         result.priorWeeks.push({week:power.week,teams:power.teams,expectedTeamCount:power.expectedTeamCount,matchupPairs:power.matchupPairs,updatedAt:power.updatedAt});
       }catch(e){errors.push('Week '+prior+'：'+String(e.message||e));}
     }
@@ -128,6 +155,11 @@
     } catch(error) {base.research.seasonError=String(error.message||error).slice(0,900);}
     base.leaguePower=matchup?await leaguePower(league,matchDoc,base,false):{teams:[],week:base.week,expectedTeamCount:0,error:matchupError,updatedAt:new Date().toISOString()};
     await addHistory(league,base.leaguePower);
+    const previous=Number((base.week.match(/\d+/)||[])[0])-1;
+    if(previous>=1&&!(league.mvpWeeks||[]).includes('Week '+previous)){
+      const url=new URL(`/nba/${league.id}/matchup`,location.origin);url.searchParams.set('week',String(previous));url.searchParams.set('date','totals');
+      try{const doc=await get(url),parsed=YahooParser.fromDocument(doc),team=parsed.teams.find(t=>t.id===league.team);if(!team)throw Error('未找到球队的历史对局');const mvp=await weeklyPlayers(league,doc,previous,team),entry=base.leaguePower.priorWeeks.find(p=>p.week==='Week '+previous);if(entry){entry.weeklyPlayers=mvp.players;entry.weeklyPlayersError=mvp.error;}else{const cached=league.completedPower;if(cached?.week==='Week '+previous)base.leaguePower.priorWeeks.push({...cached,weeklyPlayers:mvp.players,weeklyPlayersError:mvp.error});}}catch(error){base.leaguePower.mvpError=String(error.message||error).slice(0,300);}
+    }
     if(daily) {
       try {
         if(base.research?.error)throw Error(base.research.error);

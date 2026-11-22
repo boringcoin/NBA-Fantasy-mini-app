@@ -13,3 +13,21 @@ test('loopback bridge rejects webpage origins and unauthorized data, then pairs/
 test('offline HTML escapes scripts and generalizes scoring; Excel is a real workbook',async t=>{const s=fixture(10);s.leaguePower.teams[0].name='</script><script>alert(1)</script>';const data=datasets({[s.leagueID]:s},[{id:s.leagueID,theme:'warm'}]),html=await reportHTML(data);assert.ok(!html.includes('</script><script>alert(1)'));assert.ok(html.includes('Content-Security-Policy'));assert.ok(!/state\.league===['\"]\d/.test(html));const dir=await fs.mkdtemp(path.join(os.tmpdir(),'fantasy-export-'));t.after(()=>fs.rm(dir,{recursive:true,force:true}));const file=path.join(dir,'report.xlsx');await workbook(data,file);const ExcelJS=require('exceljs'),wb=new ExcelJS.Workbook();await wb.xlsx.readFile(file);assert.equal(wb.worksheets.length,8);assert.equal(wb.worksheets[0].rowCount,11);assert.equal(wb.worksheets[1].getCell('C2').numFmt,'0.00%');});
 
 test('ESPN day requests remain valid across New Year and DST, independent of locale formatting',()=>{const {dayKey,scoreboardDays}=require('../core/score.cjs');assert.equal(dayKey(new Date('2026-12-31T16:30:00Z')),'20270101');assert.deepEqual(scoreboardDays(Date.parse('2026-03-08T07:01:00Z')),['20260307','20260308','20260309','20260310']);assert.ok(scoreboardDays(Date.now()).every(key=>/^\d{8}$/.test(key)));});
+
+test('Yahoo concatenated injury markers are not treated as healthy',()=>{assert.equal(health({name:'Anthony Edwards',info:'Anthony EdwardsONo new player Notes MIN - PG,SG'}),'暂不可出场');assert.equal(health({name:'Jimmy Butler III',info:'Jimmy Butler IIIONo new player Notes GSW - SF,PF'}),'暂不可出场');assert.equal(health({name:'Example',info:'ExampleQNo new player Notes IND - PG'}),'出场待定');});
+
+test('season power sums counts and weighted shooting rates and refuses missing weeks',()=>{
+  const {seasonPower}=require('../core/season-power.cjs');
+  const columns=['FG%','FT%','PTS','AST','TO','A/T'];
+  const make=(week)=>({week:`Week ${week}`,columns,expectedTeamCount:4,teams:Array.from({length:4},(_,i)=>({id:String(i+1),name:`Team ${i+1}`,stats:{'FGM/A':week===1?'1/2':'8/10','FTM/A':'1/2',PTS:week*10+i,AST:4+i,TO:1+i,GP:1}}))});
+  const first=make(1),second=make(2),snapshot={leagueID:'1',teamID:'1',week:'Week 2',columns,powerHistory:[first],leaguePower:second};
+  const result=seasonPower(snapshot);assert.equal(result.rows.length,4);assert.equal(result.trend.length,2);assert.equal(result.trend[0].week,'Week 1');assert.equal(result.trend[0].rows.length,4);assert.equal(result.teams[0].stats.PTS,30);assert.equal(result.teams[0].stats['FGM/A'],'9/12');assert.equal(result.teams[0].stats['FG%'],.75);assert.equal(result.teams[0].stats['A/T'],4);
+  assert.match(seasonPower({...snapshot,powerHistory:[]}).error,/缺少第 1 周/);
+  const broken=make(1);delete broken.teams[0].stats['FGM/A'];broken.teams[0].stats['FG%']=.5;assert.match(seasonPower({...snapshot,powerHistory:[broken]}).error,/命中和出手/);
+});
+
+test('failed same-week sync retains last complete power snapshot with warning',()=>{
+  const previous=fixture(12);const next=structuredClone(previous);next.leaguePower={week:next.week,teams:[],error:'连接超时',updatedAt:new Date().toISOString()};
+  const merged=mergeSnapshot(previous,next);assert.equal(merged.leaguePower.teams.length,12);assert.equal(merged.leaguePower.syncWarning,'连接超时');assert.equal(merged.leaguePower.updatedAt,previous.leaguePower.updatedAt);
+  next.week='Week 2';next.leaguePower.week='Week 2';const newer=mergeSnapshot(previous,next);assert.equal(newer.leaguePower.teams.length,0);
+});
