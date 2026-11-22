@@ -54,10 +54,8 @@ jobs:
         run: ${{ matrix.command }}
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-      - name: Test real update download and installer replacement
-        run: node scripts/update-smoke.cjs
       - name: Upload installer
-        # Publishing is gated on a real replacement and launch test too.
+        # Keep installers for diagnosis even if the later update verification fails.
         uses: actions/upload-artifact@v7.0.2
         with:
           name: ThunderFantasy-${{ matrix.target }}
@@ -67,6 +65,8 @@ jobs:
           if-no-files-found: error
           retention-days: 30
           compression-level: 0
+      - name: Test real update download and installer replacement
+        run: node scripts/update-smoke.cjs
       - name: Collect synthetic validation outputs
         if: always()
         run: node -e "const fs=require('node:fs');if(fs.existsSync('.smoke/result'))fs.cpSync('.smoke/result','validation',{recursive:true});"
